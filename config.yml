@@ -1,0 +1,70 @@
+#### Data input/output related
+data_dir: ""     # The absolute path of directory containing input FCS files. This directory will be searched for FCS files recursively, therefore, user doesn't need to arrange the FCS files. User can restrict which FCS files to use using the file_name column of the file_metadata_csvfile file.
+out_dir: ""    # The absolute path of the output directory. This checkpoint RData files, plot files and SCAFFoLD input files will be stored in the out_dir
+## Marker metadata
+# Make a template marker metadata file specific to your dataset using make_marker_metadata_csv.R. Once done, open the file in Excel and edit the "used_for_analysis" column to indicate which markers should be used for UMAP/Clustering/SCAFFoLD map.
+# Include these columns in the marker metadata file (exact column names are important, order is not): 
+# 1) "channel_name": name of the channel associated wit the marker - must match the column names in @exprs of the FCS data object
+# 2) "marker_name": marker names
+# 3) "used_for_UMAP": TRUE/FALSE indicating whether the marker should be used for UMAP dimensionality reduction.
+# 4) "used_for_clustering": TRUE/FALSE indicating whether the marker should be used for clustering.
+# 5) "used_for_scaffold": TRUE/FALSE indicating whether the marker should be used for SCAFFoLD map generation.
+# 6) additional metadata columns for the markers, e.g. activation or inhibition or exhaustion or proliferation status. Currently these columns are not used by the pipeline.
+marker_metadata_csvfile: "/path/to/marker_metadata.csv"    # Absolute path of the marker metadata csv file. Use _______ script to generate a marker metadata template file for your dataset.
+
+## File metadata
+# Include these columns in the file metadata file (exact column names are important, order is not):
+# 1) "file_name": FCS file name without the directory path. The names of the FCS files in this column will be used for the analysis.
+# 2) "donor_id": Identifier of the subject/animal associated with the FCS file
+# 3) "pool_id": Identifier of the pool/batch/plate this sample was included in
+# 4) "control_sample": TRUE/FALSE indicating if the sample is a control sample or not
+# 4) additional metadata for the file, e.g. timepoint, treatment, etc. This will be included in the cell_metadata data.frame for easy plotting
+file_metadata_csvfile: "/path/to/file_metadata.csv"    # Absolute path of the file metadata csv file.
+
+gated_fcs_dir: ""  # Absolute path of the directory containing gated populations in FCS file format to be used for SCAFFoLD map generation.
+
+
+#### Setting a checkpoint id.
+# 1: Read, preprocess and transform the data. Output: checkpoint_1.RData
+# 2: Calculate UMAP. Output: checkpoint_2.RData
+# 3: Optimize clustering parameters. Output: checkpoint_3.RData & flowsom_grid_optimization.pdf
+# 4: Perform clustering. Output: checkpoint_4.RData
+# 5: Generate various matrices. Output: checkpoint_5.RData
+# 6: Prepare input files for SCAFFoLD analysis. Output: checkpoint_6.RData
+# 7: Generate SCAFFoLD map. Output: checkpoint_7.RData
+# 8: Produce final set of visualizations. Output: output.pdf
+rerun_from_step: -1 # Use -1, if you want to resume the analysis from the current step (if checkpoint_x.RData files don't exist in the out_dir (i.e. running the script for the first time), the default step id is set to 1; if checkpoint_x.RData files exist, the default step id is set to the 1 plus the value of CHECKPOINT variable in the latest checkpoint_x.RData file). If you want to rerun the analysis starting from a step other than the "default", set an appropriate value from the list of step ids above. The script will automatically determine if the data required for a rerun exists in checkpoint_x.RData files.
+
+
+#### Randomization seed
+seed: 123
+
+
+#### Data processing related
+arcsinh_cofactor: 5
+subsample: FALSE
+subsample_n: 4000
+exclude_controls: FALSE
+
+#### UMAP related
+n_neighbors: 15
+min_dist: 0.1
+spread: 0.1
+learning_rate: 0.5
+init: "random"
+
+
+#### Clustering related
+clustering_method: "flowsom" # flowsom or clara
+clara_params:
+        k: 20
+        metric: "euclidean"
+        samples: 50
+flowsom_params:
+        grid_sizes_file: "grid_sizes.csv" # A CSV file containing two columns, "xdim" and "ydim", indicating the xdim and ydim values to test; one grid size per line. The FlowSOM clustering will be performed for each grid size and the clustering from different grid sizes will be compared using Davies Bouldin Index (DBI). 
+        xdim: 6 # The xdim parameter to use for final clustering. Yet to come, maybe: "6,7,8,9,10"  # xdim of grid. Could supply multiple xdims to test, separated by commans. The number of xdims must match the number of ydims
+        ydim: 6 # The xdim parameter to use for final clustering. Yet to come, maybe: 6,7,8,9,10"  # ydim of grid. Could supply multiple ydims to test, separated by commans. The number of ydims must match the number of xdims
+        k: 3 # Change this only if meta_cluster is TRUE.
+        meta_cluster: FALSE
+        
+nthreads: -1 # The number of clustering tasks to perform in parallel. Use -1 to use all available threads. The parallel clustering works only for Non-windows operating systems.
