@@ -651,12 +651,12 @@ if(CHECKPOINT == 2) {
   set.seed(seed)
   
   # Check if the grid size file exists, otherwise exit with an error message.
-  validate_path_and_exit(clust_params$grid_sizes_file)
+  validate_path_and_exit(flowsom_params$grid_sizes_file)
   
   # Read the grid sizes from the input CSV file and save the sizes in xdim and ydim variables.
   grid_sizes <- read.csv(grid_sizes, header=T)
   if( is.null(grid_sizes$xdim) | is.null(grid_sizes$ydim) ) {
-    print_message(paste0("Warning: cannot find xdim and/or ydim columns in the grid sizes file. Make sure that ", clust_params$grid_sizes_file, " has two columns, xdim and ydim and rerun the pipeline. Exiting." ))
+    print_message(paste0("Warning: cannot find xdim and/or ydim columns in the grid sizes file. Make sure that ", flowsom_params$grid_sizes_file, " has two columns, xdim and ydim and rerun the pipeline. Exiting." ))
     quit(save = "no", status=1)
     
   } else{ 
