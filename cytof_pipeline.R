@@ -181,8 +181,87 @@ grid_optimization_plots <- function(flowsom_out) {
 #' run_flowsom
 #' @description Perform clustering 
 #' @param trans_exp_submarkers data frame of transformed expression of markers (columns) to be used for clustering.
-#' @param clust_params list containing clustering parameters 
-run_flowsom <- function(trans_exp_submarkers, clust_params) {
+#' @param clust_params list containing clustering parameters. See the function call below to understand how this list is made (using prep_param_list function).
+#' @param xdim a single xdim value or a vector of xdim values
+#' @param xdim a single ydim value or a vector of ydim values, there has to be same number of xdim and ydim values.
+#' @param optimize_grid a boolean indicating whether the current function call is for optimizing the grid sizes. If TRUE, the DBI values are calculated for each grid size and a plot of cluster number vs DBI is generated. The clustering labels are not saved. If FALSE, the cluster labels are saved for each grid size; the DBI is not calculated.
+run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize_grid) {
+
+  if(length(xdim) != length(ydim)) {
+    print_message("Fatal error: The number of xdim and ydim values are not the same. Make sure the input is correct and rerun the pipeline. Exiting.")
+    quit(save = "no", status = 1)
+  }
+  
+  print_message("Preparing the flowFrame for input to FlowSOM: ")
+  my_flowframe = flowCore::flowFrame(as.matrix(trans_exp_submarkers))
+  
+  if(nthreads == -1)
+    nthreads = parallel::detectCores() - 1
+  
+  if(nthreads > 1) {
+    my.cluster <- parallel::makeCluster(
+      nthreads, 
+      type = "FORK"
+    )
+    # Register the parallel processes. 
+    doParallel::registerDoParallel(cl = my.cluster)
+  }
+  
+  flowsom_out <- foreach(i = 1:length(xdim)) %dopar% {
+    cstart = Sys.time()
+    print_message(paste0("FlowSOM clustering begins for grid: ", xdim[i], "x", ydim[i] ))
+    fSOM <- FlowSOM(my_flowframe,
+                    # Input options:
+                    compensate = FALSE,
+                    transform = FALSE,
+                    scale = FALSE,
+                    # SOM options:
+                    xdim = xdim[i], ydim = ydim[i],
+                    # Metaclustering options:
+                    nClus = clust_params$k,
+                    silent = FALSE)
+    cend = Sys.time()
+    print_message(paste0("Clustering completed for grid: ", xdim[i], "x", ydim[i] ))
+    ctime = as.numeric(difftime(cend, cstart, units="mins"))
+    
+    fSOM$data = NULL
+    
+    if(clust_params$meta_cluster) {
+      clusters = as.vector(GetMetaclusters(fSOM))
+    }
+    else {
+      clusters = as.vector(GetClusters(fSOM))
+    }
+    
+    if(optimize_grid) {
+      DBI_obj = index.DB(trans_exp_submarkers, as.numeric(clusters) )
+      DBI = DBI_obj$DB
+      list("xdim" = xdim, "ydim" = ydim, "ctime" = ctime, "DBI" = DBI)
+    } else {
+      list("clusters" = clusters, "clust_obj" = fSOM, "xdim" = xdim, "ydim" = ydim, "ctime" = ctime, "DBI" = DBI)
+    }
+  }
+  
+  # Add the grid ids to each element of flowsom_out
+  names(flowsom_out) = paste0("cluster_", xdim, "x", ydim)
+  
+  if(optimize_grid) {
+    grid_optimization_plots(flowsom_out = flowsom_out)
+    return()
+  } else {
+    return(flowsom_out)
+  }
+}
+
+
+
+
+
+
+
+
+
+old_run_flowsom <- function(trans_exp_submarkers, clust_params) {
   optimize_grid = clust_params$optimize_grid
   if(optimize_grid & file.exists(clust_params$grid_sizes_file)) {
     grid_sizes = read.csv(grid_sizes, header=T)
@@ -232,7 +311,6 @@ run_flowsom <- function(trans_exp_submarkers, clust_params) {
                     transform = FALSE,
                     scale = FALSE,
                     # SOM options:
-                    #colsToUse = marker_metadata$channel_name[marker_metadata$is_lineage],
                     xdim = xdim[i], ydim = ydim[i],
                     # Metaclustering options:
                     nClus = clust_params$k,
@@ -269,6 +347,8 @@ run_flowsom <- function(trans_exp_submarkers, clust_params) {
     return(flowsom_out)
   }
 }
+
+
 
 run_clara <- function(trans_exp_submarkers, clust_params) {
   print_message("Clara clustering begins")
@@ -533,10 +613,10 @@ if(CHECKPOINT == 1) {
   # Setting a seed for the randomization used in UMAP calculation.
   set.seed(seed)
 
-  # Get the is_lineage status for the markers included in trans_exp df.
-  use_markers_for_UMAP <- marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name), ]$used_for_embedding
+  # Get the used_for_UMAP status for the markers included in trans_exp df.
+  use_markers_for_UMAP <- marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name), ]$used_for_UMAP
 
-  # Subset the columns of trans_exp to retain only those markers that are lineage markers.
+  # Subset the columns of trans_exp to retain only those markers that should be used_for_UMAP.
   trans_exp_submarkers <- trans_exp[, use_markers_for_UMAP ]
 
   print_message("Using the following markers for UMAP: ")
@@ -561,9 +641,63 @@ if(CHECKPOINT == 1) {
 
 
 
+###### (Clustering parameter optimization)
+if(CHECKPOINT == 2) {
+  
+  print_message("Starting the optimization of clustering parameters using following parameters: ")
+  print_param_list( prep_param_list() )
+  
+  # Setting a seed for the randomization used in clustering.
+  set.seed(seed)
+  
+  # Check if the grid size file exists, otherwise exit with an error message.
+  validate_path_and_exit(clust_params$grid_sizes_file)
+  
+  # Read the grid sizes from the input CSV file and save the sizes in xdim and ydim variables.
+  grid_sizes <- read.csv(grid_sizes, header=T)
+  if( is.null(grid_sizes$xdim) | is.null(grid_sizes$ydim) ) {
+    print_message(paste0("Warning: cannot find xdim and/or ydim columns in the grid sizes file. Make sure that ", clust_params$grid_sizes_file, " has two columns, xdim and ydim and rerun the pipeline. Exiting." ))
+    quit(save = "no", status=1)
+    
+  } else{ 
+    xdim <- as.numeric(grid_sizes$xdim)
+    ydim <- as.numeric(grid_sizes$ydim)
+  }
+  
+  
+  # Get the used_for_clustering status for the markers included in trans_exp df.
+  use_markers_for_clustering <- marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name), ]$used_for_clustering
+  
+  # Subset the columns of trans_exp to retain only those markers that should be used_for_clustering.
+  trans_exp_submarkers <- trans_exp[, use_markers_for_clustering ]
+  
+  print_message("Using the following markers for optimization: ")
+  print(paste( colnames(trans_exp_submarkers), collapse = "," ))
+  
+  # Optimization
+  if( clustering_method == "flowsom") {
+    print_message("Optimization Begins:")
+    optimization_res = run_flowsom(trans_exp_submarkers, flowsom_params, xdim, ydim, optimize_grid = TRUE)
+    print_message("The output has been generated in flowsom_grid_optimization.pdf in the output directory. Determine the best grid size(s) based in the DBI plot, input them in the config.yaml file and rerun the script.")
+    print_message("Optimization completed.")
+  }
+  else if( clustering_method == "clara") {
+    print_message("There is no optimization for clara clustering.")
+  }
+  
+  print_message("Checkpoint #3 reached. Saving the newly generated data.")
+  CHECKPOINT <- 3
+  param_list <- prep_param_list()
+  checkpoint_file = get_checkpoint_filename(out_dir, CHECKPOINT)
+  save(CHECKPOINT, optimization_res, file=checkpoint_file )
+  print_message(paste("Data is saved in", checkpoint_file) )
+  
+}
+##############################
+
 
 ###### Clustering
-if(CHECKPOINT == 2) {
+if(CHECKPOINT == 3) {
   
   print_message("Starting the clustering using following parameters: ")
   print_param_list( prep_param_list() )
@@ -571,33 +705,48 @@ if(CHECKPOINT == 2) {
   # Setting a seed for the randomization used in clustering.
   set.seed(seed)
   
-  # Get the is_lineage status for the markers included in trans_exp df.
+  # Get the used_for_clustering status for the markers included in trans_exp df.
   use_markers_for_clustering <- marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name), ]$used_for_clustering
   
-  # Subset the columns of trans_exp to retain only those markers that are lineage markers.
+  # Subset the columns of trans_exp to retain only those markers that should be used_for_clustering.
   trans_exp_submarkers <- trans_exp[, use_markers_for_clustering ]
   
   print_message("Using the following markers for clustering: ")
   print(paste( colnames(trans_exp_submarkers), collapse = "," ))
   
   # Clustering
-  print_message("Clustering Begins: using all files together")
+  print_message("Clustering Begins:")
   if( clustering_method == "flowsom") {
-    clust_res = run_flowsom(trans_exp_submarkers, flowsom_params)
+    if( grep(",", flowsom_params$xdim) ) {
+      xdim <- as.numeric(unlist(strsplit(flowsom_params$xdim, ",")))
+      ydim <- as.numeric(unlist(strsplit(flowsom_params$ydim, ",")))
+    } else {
+      xdim <- flowsom_params$xdim
+      ydim <- flowsom_params$ydim
+    }
+    clust_res = run_flowsom(trans_exp_submarkers, flowsom_params, xdim, ydim, optimize_grid = FALSE)
+    # Storing clustering results in variables.
+    cell_metadata$cluster <- as.character(clust_res[[1]]$clusters)
+    cell_metadata = cbind(cell_metadata, 
+                          sapply(clust_res, function(x) x$clusters) %>% as.data.frame() 
+                          )
+    clust_obj = clust_res[[1]]$clust_obj
+    cluster_levels = unique( cell_metadata$cluster )
+    cluster_metadata <- data.frame(cluster = cluster_levels, row.names = cluster_levels )
   }
   else if( clustering_method == "clara") {
     clust_res = run_clara(trans_exp_submarkers, clara_params)
+    # Storing clustering results in variables.
+    cell_metadata$cluster <- as.character(clust_res$clusters)
+    clust_obj = clust_res$clust_obj
+    cluster_levels = unique( cell_metadata$cluster )
+    cluster_metadata <- data.frame(cluster = cluster_levels, row.names = cluster_levels )
   }
   print_message("Clustering Completed")
 
-  # Storing clustering results in variables.
-  cell_metadata$cluster <- as.character(clust_res$clusters)
-  clust_obj = clust_res$clust_obj
-  cluster_levels = unique( cell_metadata$cluster )
-  cluster_metadata <- data.frame(cluster = cluster_levels, row.names = cluster_levels )
 
-  print_message("Checkpoint #3 reached. Saving the newly generated data.")
-  CHECKPOINT <- 3
+  print_message("Checkpoint #4 reached. Saving the newly generated data.")
+  CHECKPOINT <- 4
   param_list <- prep_param_list()
   checkpoint_file = get_checkpoint_filename(out_dir, CHECKPOINT)
   save(CHECKPOINT, cell_metadata, cluster_metadata, param_list, clust_obj, file=checkpoint_file )
@@ -608,7 +757,7 @@ if(CHECKPOINT == 2) {
 
 
 
-if(CHECKPOINT == 3) {
+if(CHECKPOINT == 4) {
   ###### Calculate frequency matrices
   file_by_cluster_freq <- cell_metadata %>% 
                           select(file_name, cluster) %>% 
@@ -635,8 +784,8 @@ if(CHECKPOINT == 3) {
     arrange( match( row.names(.), file_metadata$file_name  ) )   # Arrange the rows (files) by the order of files in file_metadata
   
   ##############################
-  CHECKPOINT <- 4
-  print_message("Checkpoint #4 reached. Saving the newly generated data.")
+  CHECKPOINT <- 5
+  print_message("Checkpoint #5 reached. Saving the newly generated data.")
   param_list <- prep_param_list()
   checkpoint_file = get_checkpoint_filename(out_dir, CHECKPOINT)
   save(CHECKPOINT, file_by_cluster_freq, file_by_cluster_freq_norm, file_by_cluster_median_exp, cluster_median_exp, file_median_exp, param_list, file=checkpoint_file )
@@ -648,7 +797,7 @@ if(CHECKPOINT == 3) {
 
 
 ###### Prep files for Scaffold
-if(CHECKPOINT == 4) {
+if(CHECKPOINT == 5) {
   # Changing the column names of cluster_median_exp to the "desc" column from the parameter slot of the FCS objects, these column names must match the "desc" column in the FCS files from the "gated" populations.
   cluster_median_exp_scaff = cluster_median_exp %>% 
     setNames( marker_metadata[ match( colnames(cluster_median_exp), marker_metadata$marker_name ) , ]$desc )
@@ -674,8 +823,8 @@ if(CHECKPOINT == 4) {
     file.create(paste0(scaffold_dir, "/", f))
     
   }
-  CHECKPOINT <- 5
-  print_message("Checkpoint #5 reached. SCAFFoLD input files are generated")
+  CHECKPOINT <- 6
+  print_message("Checkpoint #6 reached. SCAFFoLD input files are generated")
   param_list <- prep_param_list()
   checkpoint_file = get_checkpoint_filename(out_dir, CHECKPOINT)
   save(CHECKPOINT, param_list, file=checkpoint_file )
@@ -690,7 +839,7 @@ if(CHECKPOINT == 4) {
 
 
 ###### Make SCAFFoLD map
-if(CHECKPOINT == 5) {
+if(CHECKPOINT == 6) {
   if( make_scaffold_map ) {
     
     #source all R files of scaffold
@@ -818,8 +967,8 @@ if(CHECKPOINT == 5) {
   else {
     print_message("Gated populations are not provided, therefore, skipping the SCAFFoLD map generation step.")
   }
-  CHECKPOINT <- 6
-  print_message("Checkpoint #6 reached.")
+  CHECKPOINT <- 7
+  print_message("Checkpoint #7 reached.")
   param_list <- prep_param_list()
   checkpoint_file = get_checkpoint_filename(out_dir, CHECKPOINT)
   save(CHECKPOINT, cluster_metadata, param_list, file=checkpoint_file )
@@ -829,9 +978,9 @@ if(CHECKPOINT == 5) {
 
 
 # The following chunk must be executed at last to store the final processed data objects.
-if(CHECKPOINT == 6) {
-  #CHECKPOINT <- 7
-  #print_message("Checkpoint #7 reached.")
+if(CHECKPOINT == 7) {
+  CHECKPOINT <- 8
+  print_message("Checkpoint #8 reached.")
   param_list <- prep_param_list()
   checkpoint_file = file.path(out_dir,"processed_data.RData")
   save(file_metadata, marker_metadata, cell_metadata, cluster_metadata, 
@@ -927,7 +1076,7 @@ myf = function(col) {
     theme_classic() +
     theme(plot.title = element_text(size = 12))
 }
-allPlots = lapply(as.vector(marker_metadata$marker_name[ marker_metadata$used_for_embedding ]), myf)
+allPlots = lapply(as.vector(marker_metadata$marker_name[ marker_metadata$used_for_UMAP ]), myf)
 png(file.path(out_dir, "feature_plots.png"), width=20, height=15, units = "in", res=600, pointsize = 4)
 ggarrange(plotlist = allPlots, nrow = 6, ncol = 7)
 dev.off()
