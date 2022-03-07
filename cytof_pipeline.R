@@ -469,7 +469,7 @@ for(x in names(param_list)) {
   if( exists( x ) ) {
     old_val <- param_list[[x]]
     new_val <- get(x)
-    if( old_val != new_val ) {
+    if( ! identity(old_val, new_val) ) {
       msg <- paste0("\t", x, ": old value = \"", old_val, "\"; new value = \"", new_val, "\"\n" )
       old_new_val_msg <- paste0( old_new_val_msg, msg )
     }
