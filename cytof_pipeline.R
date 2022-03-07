@@ -55,7 +55,7 @@ suppressMessages({
   library(ggrepel)
   library(pheatmap)
   library(ggpubr)
-  library(ggExtra)
+  #library(ggExtra) # When ggExtra is loaded here, the "FORK" mode of doParallel (not PSOCK) fail. So will load ggExtra later while making plots.
   
   library(optparse)
   library(configr)
@@ -63,6 +63,7 @@ suppressMessages({
   
   library(doParallel)
   library(foreach)
+  library(clusterSim)
 })
 ########################### END: Loading packages ######################
 
@@ -159,7 +160,7 @@ grid_optimization_plots <- function(flowsom_out) {
   my_df = data.frame()
   for(i in 1:length(flowsom_out)) {
     obj = flowsom_out[[i]]
-    my_df = rbind(my_df, data.frame(xdim = obj$xdim, ydim = obj$ydim, DBI = obj$DBI, ctime = dbi$ctime, nclust=obj$xdim * obj$ydim))
+    my_df = rbind(my_df, data.frame(xdim = obj$xdim, ydim = obj$ydim, DBI = obj$DBI, ctime = obj$ctime, nclust=obj$xdim * obj$ydim))
   }
   dbi_plot = ggplot(my_df, aes(x=nclust, y=DBI, label=paste0(xdim,"x",ydim))) + 
     geom_line() + geom_point() + 
@@ -169,7 +170,7 @@ grid_optimization_plots <- function(flowsom_out) {
     geom_line() + geom_point() + 
     geom_text_repel(nudge_x=5, color="grey") + 
     theme_classic() + xlab("Cluster counts") + ylab("Time (min)")
-  pdf(file.path(out_dir, "flowsom_grid_optimization.pdf", width=15, height=6))
+  pdf(file.path(out_dir, "clustering_param_optimization.pdf"), width=15, height=6)
   print(dbi_plot)
   print(time_plot)
   dev.off()
@@ -236,9 +237,9 @@ run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize
     if(optimize_grid) {
       DBI_obj = index.DB(trans_exp_submarkers, as.numeric(clusters) )
       DBI = DBI_obj$DB
-      list("xdim" = xdim, "ydim" = ydim, "ctime" = ctime, "DBI" = DBI)
+      list("xdim" = xdim[i], "ydim" = ydim[i], "ctime" = ctime, "DBI" = DBI)
     } else {
-      list("clusters" = clusters, "clust_obj" = fSOM, "xdim" = xdim, "ydim" = ydim, "ctime" = ctime, "DBI" = DBI)
+      list("clusters" = clusters, "clust_obj" = fSOM, "xdim" = xdim[i], "ydim" = ydim[i], "ctime" = ctime)
     }
   }
   
@@ -383,6 +384,9 @@ get_plot_grid_layout <- function(no_of_plots) {
 }
 
 
+print_step_startup_msg <- function() {
+  cat(paste0("\n\n\n##########################################################\nStarting step#: ", CHECKPOINT+1, "\n"))
+}
 
 
 ########################### END: Functions #############################
@@ -469,7 +473,7 @@ for(x in names(param_list)) {
   if( exists( x ) ) {
     old_val <- param_list[[x]]
     new_val <- get(x)
-    if( ! identity(old_val, new_val) ) {
+    if( ! identical(old_val, new_val) ) {
       msg <- paste0("\t", x, ": old value = \"", old_val, "\"; new value = \"", new_val, "\"\n" )
       old_new_val_msg <- paste0( old_new_val_msg, msg )
     }
@@ -513,6 +517,7 @@ if( dir.exists(gated_fcs_dir) ) {
 ###### Begin the analysis: read, preprocess and transform the data.
 if(CHECKPOINT == 0) {
 
+  print_step_startup_msg()
   print_message("Starting to read FCS file and transform data using following parameters: ")
   print_param_list( prep_param_list() )
   
@@ -543,7 +548,7 @@ if(CHECKPOINT == 0) {
           mutate( desc = fcs_param_data[ match( marker_metadata$channel_name, fcs_param_data$name), ]$desc )
         is_first_file = FALSE
       }
-      tmp_raw_exp <- tmp_fcs_data@exprs %>% data.frame() %>% select(marker_metadata$channel_name) # Convert @exprs to a data frame
+      tmp_raw_exp <- tmp_fcs_data@exprs %>% data.frame() %>% dplyr::select(marker_metadata$channel_name) # Convert @exprs to a data frame
       # Remove cells containing Inf values
       tmp_raw_exp <- tmp_raw_exp[!is.infinite(rowSums(tmp_raw_exp)),]
 
@@ -556,7 +561,7 @@ if(CHECKPOINT == 0) {
         
       # arcsinh transformation
       tmp_raw_exp_minimal = tmp_raw_exp %>%
-        select( marker_metadata$channel_name ) %>% # Select markers included in the marker_metadata
+        dplyr::select( marker_metadata$channel_name ) %>% # Select markers included in the marker_metadata
         setNames( marker_metadata$marker_name ) # Rename the marker names using the marker_name column
       
       tmp_trans_exp <- asinh( tmp_raw_exp_minimal / arcsinh_cofactor )
@@ -607,6 +612,7 @@ if(CHECKPOINT == 0) {
 ###### UMAP calculation
 if(CHECKPOINT == 1) {
 
+  print_step_startup_msg()
   print_message("Starting UMAP calculation using following parameters: ")
   print_param_list( prep_param_list() )
 
@@ -644,26 +650,28 @@ if(CHECKPOINT == 1) {
 ###### (Clustering parameter optimization)
 if(CHECKPOINT == 2) {
   
+  print_step_startup_msg()
   print_message("Starting the optimization of clustering parameters using following parameters: ")
   print_param_list( prep_param_list() )
   
   # Setting a seed for the randomization used in clustering.
   set.seed(seed)
   
-  # Check if the grid size file exists, otherwise exit with an error message.
-  validate_path_and_exit(flowsom_params$grid_sizes_file)
+  if( clustering_method == "flowsom") {
+    # Check if the grid size file exists, otherwise exit with an error message.
+    validate_path_and_exit(flowsom_params$grid_sizes_file)
   
-  # Read the grid sizes from the input CSV file and save the sizes in xdim and ydim variables.
-  grid_sizes <- read.csv(grid_sizes, header=T)
-  if( is.null(grid_sizes$xdim) | is.null(grid_sizes$ydim) ) {
-    print_message(paste0("Warning: cannot find xdim and/or ydim columns in the grid sizes file. Make sure that ", flowsom_params$grid_sizes_file, " has two columns, xdim and ydim and rerun the pipeline. Exiting." ))
-    quit(save = "no", status=1)
+    # Read the grid sizes from the input CSV file and save the sizes in xdim and ydim variables.
+    grid_sizes <- read.csv(flowsom_params$grid_sizes_file, header=T)
+    if( is.null(grid_sizes$xdim) | is.null(grid_sizes$ydim) ) {
+      print_message(paste0("Fatal error: cannot find xdim and/or ydim columns in the grid sizes file. Make sure that ", flowsom_params$grid_sizes_file, " has two columns, xdim and ydim and rerun the pipeline. Exiting." ))
+      quit(save = "no", status=1)
     
-  } else{ 
-    xdim <- as.numeric(grid_sizes$xdim)
-    ydim <- as.numeric(grid_sizes$ydim)
+    } else{ 
+      xdim <- as.numeric(grid_sizes$xdim)
+      ydim <- as.numeric(grid_sizes$ydim)
+    }
   }
-  
   
   # Get the used_for_clustering status for the markers included in trans_exp df.
   use_markers_for_clustering <- marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name), ]$used_for_clustering
@@ -678,7 +686,6 @@ if(CHECKPOINT == 2) {
   if( clustering_method == "flowsom") {
     print_message("Optimization Begins:")
     optimization_res = run_flowsom(trans_exp_submarkers, flowsom_params, xdim, ydim, optimize_grid = TRUE)
-    print_message("The output has been generated in flowsom_grid_optimization.pdf in the output directory. Determine the best grid size(s) based in the DBI plot, input them in the config.yaml file and rerun the script.")
     print_message("Optimization completed.")
   }
   else if( clustering_method == "clara") {
@@ -691,7 +698,8 @@ if(CHECKPOINT == 2) {
   checkpoint_file = get_checkpoint_filename(out_dir, CHECKPOINT)
   save(CHECKPOINT, optimization_res, file=checkpoint_file )
   print_message(paste("Data is saved in", checkpoint_file) )
-  
+  print_message("NOTE::: The output of optimization has been generated in clustering_param_optimization.pdf in the output directory. Determine the optimal parameters based on the plots in the PDF, input them in the config.yaml file and rerun the script.")
+  quit(save = "no", status=0)
 }
 ##############################
 
@@ -699,6 +707,7 @@ if(CHECKPOINT == 2) {
 ###### Clustering
 if(CHECKPOINT == 3) {
   
+  print_step_startup_msg()
   print_message("Starting the clustering using following parameters: ")
   print_param_list( prep_param_list() )
 
@@ -717,7 +726,7 @@ if(CHECKPOINT == 3) {
   # Clustering
   print_message("Clustering Begins:")
   if( clustering_method == "flowsom") {
-    if( grep(",", flowsom_params$xdim) ) {
+    if( grepl(",", flowsom_params$xdim) ) {
       xdim <- as.numeric(unlist(strsplit(flowsom_params$xdim, ",")))
       ydim <- as.numeric(unlist(strsplit(flowsom_params$ydim, ",")))
     } else {
@@ -758,12 +767,13 @@ if(CHECKPOINT == 3) {
 
 
 if(CHECKPOINT == 4) {
+  print_step_startup_msg()
   ###### Calculate frequency matrices
   file_by_cluster_freq <- cell_metadata %>% 
-                          select(file_name, cluster) %>% 
+                          dplyr::select(file_name, cluster) %>% 
                           table() %>% data.frame()
   file_by_cluster_freq_norm  <- cell_metadata %>% 
-                                select(file_name, cluster) %>% 
+                                dplyr::select(file_name, cluster) %>% 
                                 table() %>% prop.table(margin = 1) %>% 
                                 data.frame() %>% mutate(Freq = Freq * 100)
   ##############################
@@ -798,6 +808,7 @@ if(CHECKPOINT == 4) {
 
 ###### Prep files for Scaffold
 if(CHECKPOINT == 5) {
+  print_step_startup_msg()
   # Changing the column names of cluster_median_exp to the "desc" column from the parameter slot of the FCS objects, these column names must match the "desc" column in the FCS files from the "gated" populations.
   cluster_median_exp_scaff = cluster_median_exp %>% 
     setNames( marker_metadata[ match( colnames(cluster_median_exp), marker_metadata$marker_name ) , ]$desc )
@@ -840,6 +851,7 @@ if(CHECKPOINT == 5) {
 
 ###### Make SCAFFoLD map
 if(CHECKPOINT == 6) {
+  print_step_startup_msg()
   if( make_scaffold_map ) {
     
     #source all R files of scaffold
@@ -979,6 +991,7 @@ if(CHECKPOINT == 6) {
 
 # The following chunk must be executed at last to store the final processed data objects.
 if(CHECKPOINT == 7) {
+  print_step_startup_msg()
   CHECKPOINT <- 8
   print_message("Checkpoint #8 reached.")
   param_list <- prep_param_list()
@@ -1060,7 +1073,7 @@ if(FALSE) {
 
 
 
-
+library(ggExtra)
 ######### Prelim. Plotting commands
 subsmpl = sample(1:nrow(trans_exp),10000)
 myf = function(col) {
@@ -1255,7 +1268,7 @@ pdf(file.path(out_dir, "plots.pdf"))
   breaksList = seq(0, max(log1p(file_median_exp)), by = 0.1)
   
   pheatmap(
-            file_median_exp %>% select(which(marker_metadata$used_for_clustering)) %>% t() %>% log1p(),
+            file_median_exp %>% dplyr::select(which(marker_metadata$used_for_clustering)) %>% t() %>% log1p(),
             annotation_col =
               data.frame(
                 batch = as.character(file_metadata$pool_id),
