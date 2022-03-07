@@ -27,7 +27,7 @@ gated_fcs_dir: ""  # Absolute path of the directory containing gated populations
 #### Setting a checkpoint id.
 # 1: Read, preprocess and transform the data. Output: checkpoint_1.RData
 # 2: Calculate UMAP. Output: checkpoint_2.RData
-# 3: Optimize clustering parameters. Output: checkpoint_3.RData & flowsom_grid_optimization.pdf
+# 3: Optimize clustering parameters. Output: checkpoint_3.RData & clustering_param_optimization.pdf
 # 4: Perform clustering. Output: checkpoint_4.RData
 # 5: Generate various matrices. Output: checkpoint_5.RData
 # 6: Prepare input files for SCAFFoLD analysis. Output: checkpoint_6.RData
@@ -62,9 +62,9 @@ clara_params:
         samples: 50
 flowsom_params:
         grid_sizes_file: "grid_sizes.csv" # A CSV file containing two columns, "xdim" and "ydim", indicating the xdim and ydim values to test; one grid size per line. The FlowSOM clustering will be performed for each grid size and the clustering from different grid sizes will be compared using Davies Bouldin Index (DBI). 
-        xdim: 6 # The xdim parameter to use for final clustering. Yet to come, maybe: "6,7,8,9,10"  # xdim of grid. Could supply multiple xdims to test, separated by commans. The number of xdims must match the number of ydims
-        ydim: 6 # The xdim parameter to use for final clustering. Yet to come, maybe: 6,7,8,9,10"  # ydim of grid. Could supply multiple ydims to test, separated by commans. The number of ydims must match the number of xdims
+        xdim: "6" # The xdim parameter to use for final clustering. Yet to come, maybe: "6,7,8,9,10"  # xdim of grid. Could supply multiple xdims to test, separated by commans. The number of xdims must match the number of ydims
+        ydim: "6" # The xdim parameter to use for final clustering. Yet to come, maybe: 6,7,8,9,10"  # ydim of grid. Could supply multiple ydims to test, separated by commans. The number of ydims must match the number of xdims
         k: 3 # Change this only if meta_cluster is TRUE.
         meta_cluster: FALSE
         
-nthreads: -1 # The number of clustering tasks to perform in parallel. Use -1 to use all available threads. The parallel clustering works only for Non-windows operating systems.
+nthreads: 10 # The number of clustering tasks to perform in parallel. Use -1 to use all available threads. The parallel clustering works only for Non-windows operating systems.
