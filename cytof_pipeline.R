@@ -995,7 +995,8 @@ if(CHECKPOINT == 7) {
   CHECKPOINT <- 8
   print_message("Checkpoint #8 reached.")
   param_list <- prep_param_list()
-  checkpoint_file = file.path(out_dir,"processed_data.RData")
+  #checkpoint_file = file.path(out_dir,"processed_data.RData")
+  checkpoint_file = get_checkpoint_filename(out_dir, CHECKPOINT)
   save(file_metadata, marker_metadata, cell_metadata, cluster_metadata, 
        file_by_cluster_freq, file_by_cluster_freq_norm, file_by_cluster_median_exp, 
        cluster_median_exp, file_median_exp, 
@@ -1003,70 +1004,6 @@ if(CHECKPOINT == 7) {
   print_message(paste("Final processed data objects are stored in:", checkpoint_file) )
 }
 
-
-
-
-
-
-### Extra stuff related to scaffold analysis, ignore for now.
-# DON'T RUN
-if(FALSE) {
-
-  # Analyze cluster frequencies
-  remove_freqsignif_columns(scaffold_dir)
-  analyze_cluster_frequencies(scaffold_dir, "HS1","HS2",5,10000,TRUE,"",FALSE,2)
-  setwd(out_dir)
-  
-  # Make sure the "gated" directory is in the scaffold_dir
-  run_analysis_gated(scaffold_dir, paste0(file_by_cluster_freq$file_name[1],".clustered.txt"), colnames(trans_exp), 5)
-  setwd(out_dir)
-  
-  analyze_cluster_expression(scaffold_dir, "HS1", "HS2", 5, 10000, colnames(trans_exp)[10], 50, 5, FALSE, 2)
-  
-  
-  
-  ###### Can use two vectors of filenames as groups in the analyze_cluster_frequencies function. Just source the following function.
-  # Make sure that the union of the filename-vectors includes all files.
-  calculate_FoldChange = function(freqMatrix, group1, group2) {
-    result_FC <- numeric()
-    
-    group1_mean <- rowMeans(freqMatrix[,which(grepl(paste0(group1, collapse="|"), colnames(freqMatrix)))])
-    group2_mean <- rowMeans(freqMatrix[,which(grepl(paste0(group2, collapse="|"), colnames(freqMatrix)))])
-    
-    
-    if(any(group1_mean == 0)) {
-      index1 <- which(group1_mean == 0)
-      group1_mean[index1] = 1/nrow(freqMatrix)
-      group2_mean[index1] = group2_mean[index1] + 1/nrow(freqMatrix)
-    }
-    if(any(group2_mean == 0)) {
-      index2 <- which(group2_mean == 0)
-      group2_mean[index2] = 1/nrow(freqMatrix)
-      group1_mean[index2] = group1_mean[index2] + 1/nrow(freqMatrix)
-    }
-    
-    
-    result_FC <- group2_mean/group1_mean
-    result_FC[is.na(result_FC)] <- 1; result_FC[is.infinite(result_FC)] <- 1
-    
-    result_FC <- round(log2(result_FC), digits = 3)
-    
-    
-    return(result_FC)
-  }
-  remove_freqsignif_columns(scaffold_dir)
-  analyze_cluster_frequencies(scaffold_dir, c("HS10","HS11","HS12","HS13","HS14"), c("HS20","HS21","HS22","HS23","HS24") ,5,10000,TRUE,"",FALSE,2)
-  analyze_cluster_expression(scaffold_dir, c("HS10","HS11","HS12","HS13","HS14"), c("HS20","HS21","HS22","HS23","HS24"), 5, 10000, colnames(trans_exp)[10], 50, 5, FALSE, 2)
-  
-  
-  
-  
-  f = scaffold_load("../Desktop/xhlt2/cytonorm/pipeline/scaffold/Norm_XHLT2-HS1-T1PBMC1-CYM1_Singlets_normalized.fcs.clustered.txt.scaffold")
-  get.vertex.attribute(f$graphs$`Norm_XHLT2-HS1-T1PBMC1-CYM1_Singlets_normalized.fcs.clustered.txt`, c("variance_test"))
-  f$dataset.statistics$max.marker.vals$variance_test = 62
-  V(f$graphs$`Norm_XHLT2-HS1-T1PBMC1-CYM1_Singlets_normalized.fcs.clustered.txt`)$variance_test
-
-}
 
 
 
@@ -1099,7 +1036,7 @@ dev.off()
 
 ## UMAPs split by clusters
 set.seed(1234)
-cell_metadata_sub = cell_metadata %>% sample_n(100000) 
+cell_metadata_sub = cell_metadata %>% sample_n(min(nrow(.),100000)) 
 cell_metadata_sub$col_to_use = cell_metadata_sub$cluster
 x_range = range(cell_metadata_sub$UMAP1) %>% scales::expand_range(add = 0.2)
 y_range = range(cell_metadata_sub$UMAP2) %>% scales::expand_range(add = 0.2)
