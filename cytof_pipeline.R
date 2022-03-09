@@ -380,7 +380,7 @@ get_plot_grid_layout <- function(no_of_plots) {
   }
   if(nrow * ncol < no_of_plots)
     print("The grid size doesn't fit all plots.")
-  return(c(nrow, ncol))
+  return(list("nrow"=nrow, "ncol"=ncol))
 }
 
 
@@ -407,10 +407,6 @@ nthreads = ifelse(isWindows, 1, nthreads)
 if( ! dir.exists( out_dir ) )
   dir.create( out_dir )
 
-# Exit if the input files don't exist
-validate_path_and_exit(data_dir, dir = TRUE)
-validate_path_and_exit(marker_metadata_csvfile, dir = FALSE)
-validate_path_and_exit(file_metadata_csvfile, dir = FALSE)
 
 
 ########################### Global variables ###########################
@@ -421,14 +417,6 @@ CHECKPOINT <- 0
 
 # A list of parameter values to be stored at each checkpoints.
 param_list <- list()
-
-# Marker metadata
-marker_metadata <- read.csv(marker_metadata_csvfile) 
-
-# File metadata
-file_metadata <- read.csv(file_metadata_csvfile)
-if(exclude_controls)
-  file_metadata <- file_metadata %>% filter( ! control_sample )
 
 ########################### END: Global variables ######################
 
@@ -485,6 +473,26 @@ if( old_new_val_msg != "") {
 }
 
 ######### END: Load checkpoint data if exist in the out_dir ############
+
+
+
+################ Check if the input files exist if the CHECKPOINT is 0 ##################
+if(CHECKPOINT == 0) {
+  # Exit if the input files don't exist
+  validate_path_and_exit(data_dir, dir = TRUE)
+  
+  # Marker metadata
+  validate_path_and_exit(marker_metadata_csvfile, dir = FALSE)
+  marker_metadata <- read.csv(marker_metadata_csvfile) 
+  
+  # File metadata
+  validate_path_and_exit(file_metadata_csvfile, dir = FALSE)
+  file_metadata <- read.csv(file_metadata_csvfile)
+  if(exclude_controls)
+    file_metadata <- file_metadata %>% filter( ! control_sample )
+}
+################ END: Check if the input files exist ##################
+
 
 
 ################ Set up SCAFFoLD analysis directories ##################
@@ -1012,6 +1020,7 @@ if(CHECKPOINT == 7) {
 
 library(ggExtra)
 ######### Prelim. Plotting commands
+
 subsmpl = sample(1:nrow(trans_exp),10000)
 myf = function(col) {
   exp = as.data.frame(trans_exp[subsmpl,col])[,1]
@@ -1049,7 +1058,7 @@ for(i in groups ) {
 }
 grid_size = get_plot_grid_layout(length(groups))
 png(file.path(out_dir, "split_umap_by_cluster.png"), width=30, height=30, units = "in", res=600, pointsize = 4)
-ggarrange(plotlist=plot_list, ncol=grid_size[2], nrow=grid_size[1])
+ggarrange(plotlist=plot_list, ncol=grid_size$ncol, nrow=grid_size$nrow)
 dev.off()
 
 
@@ -1069,18 +1078,6 @@ pdf(file.path(out_dir, "plots.pdf"))
     theme_classic() + 
     guides(color = guide_legend(override.aes = list(size = 3, alpha=1)))
 
-  
-  sqrt = sqrt(length(batch_levels))
-  if( floor(sqrt) == sqrt ) {
-    nrow <- sqrt
-    ncol <- sqrt
-  } else if( sqrt >= (floor(sqrt)+0.5) ) {
-    nrow <- ceiling( sqrt )
-    ncol <- ceiling( sqrt )
-  } else {
-    nrow <- ceiling( sqrt )
-    ncol <- floor( sqrt )
-  }
   plotlist = list()  
   for( b in sort(batch_levels) ) {
     cell_metadata_sub = cell_metadata %>% filter( pool_id == b )
@@ -1093,7 +1090,8 @@ pdf(file.path(out_dir, "plots.pdf"))
         ggtitle(b)
         guides(color = FALSE)
   }
-  ggarrange(plotlist = plotlist, nrow=nrow, ncol=ncol)
+  plot_grid_size = get_plot_grid_layout(length(batch_levels))
+  ggarrange(plotlist = plotlist, nrow=plot_grid_size$nrow, ncol=plot_grid_size$ncol)
   
   
   if( any(file_metadata$control_sample) ) {
