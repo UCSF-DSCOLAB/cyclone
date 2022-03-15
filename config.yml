@@ -61,7 +61,7 @@ clara_params:
         metric: "euclidean"
         samples: 50
 flowsom_params:
-        grid_sizes_file: "grid_sizes.csv" # A CSV file containing two columns, "xdim" and "ydim", indicating the xdim and ydim values to test; one grid size per line. The FlowSOM clustering will be performed for each grid size and the clustering from different grid sizes will be compared using Davies Bouldin Index (DBI). 
+        grid_sizes_file: "/path/to/grid_sizes.csv" # An absolute path to CSV file containing two columns, "xdim" and "ydim", indicating the xdim and ydim values to test; one grid size per line. The FlowSOM clustering will be performed for each grid size and the clustering from different grid sizes will be compared using Davies Bouldin Index (DBI). 
         xdim: "6" # The xdim parameter to use for final clustering. Yet to come, maybe: "6,7,8,9,10"  # xdim of grid. Could supply multiple xdims to test, separated by commans. The number of xdims must match the number of ydims
         ydim: "6" # The xdim parameter to use for final clustering. Yet to come, maybe: 6,7,8,9,10"  # ydim of grid. Could supply multiple ydims to test, separated by commans. The number of ydims must match the number of xdims
         k: 3 # Change this only if meta_cluster is TRUE.
