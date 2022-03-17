@@ -1207,8 +1207,9 @@ pdf(file.path(out_dir, "plots.pdf"))
   my_palette_greens = colorRampPalette(brewer.pal(n = 9, name = "Greens"))
   breaksList = seq(0, max(log1p(file_median_exp)), by = 0.1)
   
+  markers_for_clustering <- marker_metadata[ match( colnames(file_median_exp), marker_metadata$marker_name), ]$used_for_clustering
   pheatmap(
-            file_median_exp %>% dplyr::select(which(marker_metadata$used_for_clustering)) %>% t() %>% log1p(),
+            file_median_exp %>% dplyr::select(which(markers_for_clustering)) %>% t() %>% log1p(),
             annotation_col =
               data.frame(
                 batch = as.character(file_metadata$pool_id),
@@ -1225,9 +1226,6 @@ pdf(file.path(out_dir, "plots.pdf"))
             main = "File x Cluster: expression (arcsinh-log1p)",
             border_color = NA
   )
-  
-  
-
   
   dev.off()
   
