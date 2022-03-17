@@ -817,30 +817,35 @@ if(CHECKPOINT == 4) {
 ###### Prep files for Scaffold
 if(CHECKPOINT == 5) {
   print_step_startup_msg()
-  # Changing the column names of cluster_median_exp to the "desc" column from the parameter slot of the FCS objects, these column names must match the "desc" column in the FCS files from the "gated" populations.
-  cluster_median_exp_scaff = cluster_median_exp %>% 
-    setNames( marker_metadata[ match( colnames(cluster_median_exp), marker_metadata$marker_name ) , ]$desc )
+  if( make_scaffold_map ) {  
+    # Changing the column names of cluster_median_exp to the "desc" column from the parameter slot of the FCS objects, these column names must match the "desc" column in the FCS files from the "gated" populations.
+    cluster_median_exp_scaff = cluster_median_exp %>% 
+      setNames( marker_metadata[ match( colnames(cluster_median_exp), marker_metadata$marker_name ) , ]$desc )
+    
+    file_by_cluster_exp_freq <- cluster_median_exp_scaff %>% rownames_to_column("cluster") %>% 
+                                full_join(file_by_cluster_freq, by = c("cluster" = "cluster") ) %>%
+                                dplyr::rename(popsize = Freq, cellType = cluster) %>%   # Need to explicitely specify dplyr:: because I think there is another rename function in scaffold code(?) or some where else.
+                                relocate(file_name,  .before = popsize)
+    
+    for( f in unique( as.vector(file_by_cluster_freq$file_name)) ) {
+      exp_freq_f <- file_by_cluster_exp_freq %>% filter(file_name == f) %>% dplyr::rename( sample = file_name)
   
-  file_by_cluster_exp_freq <- cluster_median_exp_scaff %>% rownames_to_column("cluster") %>% 
-                              full_join(file_by_cluster_freq, by = c("cluster" = "cluster") ) %>%
-                              dplyr::rename(popsize = Freq, cellType = cluster) %>%   # Need to explicitely specify dplyr:: because I think there is another rename function in scaffold code(?) or some where else.
-                              relocate(file_name,  .before = popsize)
-  
-  for( f in unique( as.vector(file_by_cluster_freq$file_name)) ) {
-    exp_freq_f <- file_by_cluster_exp_freq %>% filter(file_name == f) %>% dplyr::rename( sample = file_name)
-
-    cells_f <- cell_metadata$file_name == f
-    cell_metadata_f <- cell_metadata %>% filter( cells_f )
-    #trans_exp_f <- trans_exp %>% filter( cells_f ) %>% mutate( cellType = cell_metadata_f$cluster )
-    
-    trans_exp_f <- trans_exp %>% filter( cells_f ) %>% 
-      setNames( marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name ) , ]$desc ) %>% 
-      mutate( cellType = cell_metadata_f$cluster )
-    
-    write.table( exp_freq_f, paste0(scaffold_dir, "/", f, ".clustered.txt"), sep = "\t", quote = FALSE, row.names = F )
-    scaffold_save( trans_exp_f, paste0(scaffold_dir, "/", f, ".clustered.all_events.RData") )
-    file.create(paste0(scaffold_dir, "/", f))
-    
+      cells_f <- cell_metadata$file_name == f
+      cell_metadata_f <- cell_metadata %>% filter( cells_f )
+      #trans_exp_f <- trans_exp %>% filter( cells_f ) %>% mutate( cellType = cell_metadata_f$cluster )
+      
+      trans_exp_f <- trans_exp %>% filter( cells_f ) %>% 
+        setNames( marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name ) , ]$desc ) %>% 
+        mutate( cellType = cell_metadata_f$cluster )
+      
+      write.table( exp_freq_f, paste0(scaffold_dir, "/", f, ".clustered.txt"), sep = "\t", quote = FALSE, row.names = F )
+      scaffold_save( trans_exp_f, paste0(scaffold_dir, "/", f, ".clustered.all_events.RData") )
+      file.create(paste0(scaffold_dir, "/", f))
+      
+    }
+  }
+  else {
+    print_message("Gated populations are not provided, therefore, skipping the step of generating files for SCAFFoLD.")
   }
   CHECKPOINT <- 6
   print_message("Checkpoint #6 reached. SCAFFoLD input files are generated")
