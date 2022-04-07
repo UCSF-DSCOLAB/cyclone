@@ -195,6 +195,7 @@ run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize
   
   print_message("Preparing the flowFrame for input to FlowSOM: ")
   my_flowframe = flowCore::flowFrame(as.matrix(trans_exp_submarkers))
+  print_message("Starting the FlowSOM clustering: ")
   
   if(nthreads == -1)
     nthreads = parallel::detectCores() - 1
@@ -550,12 +551,13 @@ if(CHECKPOINT == 0) {
       tmp_fcs_data <- read.FCS(paste0(data_dir, "/",f)) # Read FCS file and store in a temporary variable
 
       # Finding the "desc" values from the first FCS object for the user-specified channel_name in marker_metadata. The "desc" column is stored in marker_metada for using it as column names for the data exported for SCAFFoLD analysis. 
-      if(is_first_file) {
-        fcs_param_data = tmp_fcs_data@parameters@data %>% mutate( desc = ifelse(is.na(desc), name, desc) )
-        marker_metadata = marker_metadata %>% 
-          mutate( desc = fcs_param_data[ match( marker_metadata$channel_name, fcs_param_data$name), ]$desc )
-        is_first_file = FALSE
-      }
+      # Deprecated: The following if block is deprecated. The "desc" column is no longer used downstream, instead the "marker_name" column is used. Since I am requiring users to generate marker_metadata using make_marker_metadata_csv.R, the "marker_name" column should have correct names. But this also means that users can not change the names in "marker_name" column in marker_metadata
+      #if(is_first_file) {
+      #  fcs_param_data = tmp_fcs_data@parameters@data %>% mutate( desc = ifelse(is.na(desc), name, desc) )
+      #  marker_metadata = marker_metadata %>% 
+      #    mutate( desc = fcs_param_data[ match( marker_metadata$channel_name, fcs_param_data$name), ]$desc )
+      #  is_first_file = FALSE
+      #}
       tmp_raw_exp <- tmp_fcs_data@exprs %>% data.frame() %>% dplyr::select(marker_metadata$channel_name) # Convert @exprs to a data frame
       # Remove cells containing Inf values
       tmp_raw_exp <- tmp_raw_exp[!is.infinite(rowSums(tmp_raw_exp)),]
@@ -818,9 +820,9 @@ if(CHECKPOINT == 4) {
 if(CHECKPOINT == 5) {
   print_step_startup_msg()
   if( make_scaffold_map ) {  
-    # Changing the column names of cluster_median_exp to the "desc" column from the parameter slot of the FCS objects, these column names must match the "desc" column in the FCS files from the "gated" populations.
+    # Changing the column names of cluster_median_exp to the "marker_name" column from the parameter slot of the FCS objects, these column names must match the "marker_name" column in the FCS files from the "gated" populations.
     cluster_median_exp_scaff = cluster_median_exp %>% 
-      setNames( marker_metadata[ match( colnames(cluster_median_exp), marker_metadata$marker_name ) , ]$desc )
+      setNames( marker_metadata[ match( colnames(cluster_median_exp), marker_metadata$marker_name ) , ]$marker_name )
     
     file_by_cluster_exp_freq <- cluster_median_exp_scaff %>% rownames_to_column("cluster") %>% 
                                 full_join(file_by_cluster_freq, by = c("cluster" = "cluster") ) %>%
@@ -835,7 +837,7 @@ if(CHECKPOINT == 5) {
       #trans_exp_f <- trans_exp %>% filter( cells_f ) %>% mutate( cellType = cell_metadata_f$cluster )
       
       trans_exp_f <- trans_exp %>% filter( cells_f ) %>% 
-        setNames( marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name ) , ]$desc ) %>% 
+        setNames( marker_metadata[ match( colnames(trans_exp), marker_metadata$marker_name ) , ]$marker_name ) %>% 
         mutate( cellType = cell_metadata_f$cluster )
       
       write.table( exp_freq_f, paste0(scaffold_dir, "/", f, ".clustered.txt"), sep = "\t", quote = FALSE, row.names = F )
@@ -877,7 +879,7 @@ if(CHECKPOINT == 6) {
     # Yet to add more validations to confirm the required inputs exist.
     ref_dataset_file <-
       paste0(file_by_cluster_freq$file_name[1], ".clustered.txt")
-    scaffold:::run_analysis_gated(scaffold_dir, ref_dataset_file, marker_metadata[marker_metadata$used_for_scaffold,]$desc, 5)
+    scaffold:::run_analysis_gated(scaffold_dir, ref_dataset_file, marker_metadata[marker_metadata$used_for_scaffold,]$marker_name, 5)
     
     # Get the closest landmark populations and store them in cluster_metadata, and calculate various statistics and add them to .scaffold file.
     scaf_data <-
