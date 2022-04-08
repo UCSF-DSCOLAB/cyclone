@@ -197,6 +197,8 @@ run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize
   my_flowframe = flowCore::flowFrame(as.matrix(trans_exp_submarkers))
   print_message("Starting the FlowSOM clustering: ")
   
+  # Clean up the environment
+  rm(trans_exp_submarkers)
   gc()
   
   if(nthreads == -1)
