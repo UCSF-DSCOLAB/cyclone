@@ -197,6 +197,8 @@ run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize
   my_flowframe = flowCore::flowFrame(as.matrix(trans_exp_submarkers))
   print_message("Starting the FlowSOM clustering: ")
   
+  gc()
+  
   if(nthreads == -1)
     nthreads = parallel::detectCores() - 1
   
