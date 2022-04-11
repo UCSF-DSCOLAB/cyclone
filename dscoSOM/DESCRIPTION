@@ -1,0 +1,41 @@
+Package: dscoSOM
+Type: Package
+Title: DSCoLab CyTOF Pipeline
+Version: 0.1.0
+Authors@R: c(person("Ravi", "Patel", email = "ravi.patel2@ucsf.edu", role=c("aut", "cre")),
+    person("Daniel", "Bunis", email = "daniel.bunis@ucsf.edu", role=c("aut")),
+    person("Bushra", "Samad", email = "bushra.samad@ucsf.edu", role=c("aut")),
+    person("Rebecca", "Jaszczak", email = "rebecca.jaszczak@ucsf.edu", role=c("aut")))
+Description: Under Construction. Installation, documentation, and visualization 
+    examples for the DSCoLab's FlowSOM-based CyTOF pipeline.
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Imports: cluster,
+    clusterSim,
+    configr,
+    devtools,
+    doParallel,
+    flowCore,
+    FlowSOM,
+    foreach,
+    ggExtra,
+    ggpubr,
+    ggrepel,
+    gridExtra,
+    igraph,
+    optparse,
+    pals,
+    parallel,
+    pheatmap,
+    RColorBrewer,
+    scales,
+    tidyverse,
+    uwot,
+    viridis
+Suggests: knitr,
+    rmarkdown,
+    BiocStyle,
+    dittoSeq
+VignetteBuilder: knitr
+RoxygenNote: 7.1.2
