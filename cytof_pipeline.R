@@ -1091,14 +1091,16 @@ cell_metadata_sub %>%
 
 # Average gene expression heatmap (unscaled)
 cluster_median_exp_tmp = cluster_median_exp[ , marker_metadata$marker_name[marker_metadata$used_for_clustering] ]
-p <- pheatmap( cluster_median_exp_tmp, clustering_method="ward.D2", main="Archsinh-transformed expression (unscaled)", silent = T )
-print(p[[4]])
+p <- pheatmap::pheatmap( cluster_median_exp_tmp, clustering_method="ward.D2", main="Archsinh-transformed expression (unscaled)", silent = T )
+grid::grid.newpage() #https://stackoverflow.com/questions/43051525/how-to-draw-pheatmap-plot-to-screen-and-also-save-to-file
+grid::grid.draw(p$gtable)
 
 # Average gene expression heatmap (marker-wise scaled)
 cluster_median_exp_s = apply( cluster_median_exp_tmp, 2, scale)
 rownames(cluster_median_exp_s) = rownames(cluster_median_exp_tmp)
-p <- pheatmap( cluster_median_exp_s, clustering_method="ward.D2", main="Archsinh-transformed expression (column-scaled)", silent = T )
-print(p[[4]])
+p <- pheatmap::pheatmap( cluster_median_exp_s, clustering_method="ward.D2", main="Archsinh-transformed expression (column-scaled)", silent = T )
+grid::grid.newpage()
+grid::grid.draw(p$gtable)
 
 dev.off()
 
@@ -1168,7 +1170,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
   breaksList = seq(0, max(log1p(file_by_cluster_freq_norm$Freq)), by = 0.1)
   
   # File x Cluster frequency heatmap
-  p <- pheatmap( file_by_cluster_freq_norm %>% 
+  p <- pheatmap::pheatmap( file_by_cluster_freq_norm %>% 
               pivot_wider(names_from="file_name",values_from=Freq) %>% 
               column_to_rownames("cluster") %>%
               log1p() %>% as.matrix(),
@@ -1188,10 +1190,11 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
             main = "File x Cluster: cell freq. (norm-log1p)",
             border_color = NA, silent = T
             )
-  print(p[[4]])
-
+  grid::grid.newpage()
+  grid::grid.draw(p$gtable)
+  
   # Pool(batch) x Cluster frequency heatmap
-  p <- pheatmap( file_by_cluster_freq %>% 
+  p <- pheatmap::pheatmap( file_by_cluster_freq %>% 
                mutate(pool_id = file_metadata[match( (.)$file_name, file_metadata$file_name),]$pool_id ) %>% 
                mutate(file_name = NULL) %>% 
                group_by(cluster, pool_id) %>% summarise(Freq = sum(Freq)) %>%
@@ -1205,14 +1208,15 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
             main="Batch x Cluster: cell freq. (norm-log1p)",
             border_color = NA, silent = T
             )
-  print(p[[4]])
-
+  grid::grid.newpage()
+  grid::grid.draw(p$gtable)
+  
   # If control samples are used
   if( any( file_metadata$control_sample ) ) {
     control_file_names <- file_metadata %>% filter(control_sample) %>% pull(file_name)
     
     # Pool(batch) x Cluster frequency heatmap for control-only samples
-    p <- pheatmap( file_by_cluster_freq %>% filter( file_name %in% control_file_names ) %>% 
+    p <- pheatmap::pheatmap( file_by_cluster_freq %>% filter( file_name %in% control_file_names ) %>% 
                 mutate(pool_id = file_metadata[match( (.)$file_name, file_metadata$file_name),]$pool_id ) %>% 
                 mutate(file_name = NULL) %>% 
                 group_by(cluster, pool_id) %>% summarise(Freq = sum(Freq)) %>%
@@ -1226,10 +1230,11 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
               main="Batch x Cluster: cell freq. (norm-log1p) (Controls only)",
               border_color = NA, silent = T
     )
-    print(p[[4]])
+    grid::grid.newpage()
+    grid::grid.draw(p$gtable)
     
     # Pool(batch) x Cluster frequency heatmap for non-control-only samples
-    p <- pheatmap( file_by_cluster_freq %>% filter( ! file_name %in% control_file_names ) %>% 
+    p <- pheatmap::pheatmap( file_by_cluster_freq %>% filter( ! file_name %in% control_file_names ) %>% 
                 mutate(pool_id = file_metadata[match( (.)$file_name, file_metadata$file_name),]$pool_id ) %>% 
                 mutate(file_name = NULL) %>% 
                 group_by(cluster, pool_id) %>% summarise(Freq = sum(Freq)) %>%
@@ -1243,7 +1248,8 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
               main="Batch x Cluster: cell freq. (norm-log1p) (Non-controls only)",
               border_color = NA, silent = T
     )
-    print(p[[4]])
+    grid::grid.newpage()
+    grid::grid.draw(p$gtable)
   }
   
   
@@ -1253,7 +1259,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
   breaksList = seq(0, max(log1p(file_median_exp)), by = 0.1)
   
   markers_for_clustering <- marker_metadata[ match( colnames(file_median_exp), marker_metadata$marker_name), ]$used_for_clustering
-  p <- pheatmap(
+  p <- pheatmap::pheatmap(
             file_median_exp %>% dplyr::select(which(markers_for_clustering)) %>% t() %>% log1p(),
             annotation_col =
               data.frame(
@@ -1271,7 +1277,8 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
             main = "File x Cluster: expression (arcsinh-log1p)",
             border_color = NA
   )
-  print(p[[4]])
+  grid::grid.newpage()
+  grid::grid.draw(p$gtable)
   
   
 dev.off()
