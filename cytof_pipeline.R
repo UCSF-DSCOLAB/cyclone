@@ -1080,7 +1080,6 @@ set.seed(1234)
 cell_metadata_sub = cell_metadata %>% sample_n(min(nrow(.),100000)) 
 label_cell_meta <- cell_metadata_sub %>% group_by(cluster) %>% summarise(UMAP1=mean(UMAP1), UMAP2=mean(UMAP2) )
 cell_metadata_sub %>%
-  sample_n(size=down_size_for_plotting) %>%
   mutate(cluster=factor(cluster, levels=sort(as.numeric(unique(cluster))))) %>%
   ggplot( aes(UMAP1, UMAP2, color=cluster)) +
   geom_point(size=0.1, alpha=0.5) +
