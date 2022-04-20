@@ -1032,6 +1032,7 @@ if(CHECKPOINT == 7) {
 library(ggExtra)
 ######### Prelim. Plotting commands
 
+# Feature plots
 subsmpl = sample(1:nrow(trans_exp),10000)
 myf = function(col) {
   exp = as.data.frame(trans_exp[subsmpl,col])[,1]
@@ -1075,11 +1076,44 @@ dev.off()
 
 
 
+pdf(file.path(out_dir, "plots.pdf"))
+
+# UMAP colored by clusters
+set.seed(1234)
+cell_metadata_sub = cell_metadata %>% sample_n(min(nrow(.),100000)) 
+label_cell_meta <- cell_metadata_sub %>% group_by(cluster) %>% summarise(UMAP1=mean(UMAP1), UMAP2=mean(UMAP2) )
+cell_metadata_sub %>%
+  sample_n(size=down_size_for_plotting) %>%
+  mutate(cluster=factor(cluster, levels=sort(as.numeric(unique(cluster))))) %>%
+  ggplot( aes(UMAP1, UMAP2, color=cluster)) +
+  geom_point(size=0.1, alpha=0.5) +
+  theme_classic() +
+  scale_color_manual(values=c(alphabet2(26),kelly(10)) %>% `names<-`(NULL)) +
+  guides(color=guide_legend(override.aes=list(size=2, alpha=1))) +
+  geom_text(data=label_cell_meta, aes(label=cluster), color="black")
+
+
+# Average gene expression heatmap (unscaled)
+cluster_median_exp_tmp = cluster_median_exp[ , marker_metadata$marker_name[marker_metadata$used_for_clustering] ]
+p <- pheatmap( cluster_median_exp_tmp, clustering_method="ward.D2", main="Archsinh-transformed expression (unscaled)", silent = T )
+print(p)
+
+# Average gene expression heatmap (marker-wise scaled)
+cluster_median_exp_s = apply( cluster_median_exp_tmp, 2, scale)
+rownames(cluster_median_exp_s) = rownames(cluster_median_exp_tmp)
+p <- pheatmap( cluster_median_exp_s, clustering_method="ward.D2", main="Archsinh-transformed expression (column-scaled)", silent = T )
+print(p)
+
+dev.off()
+
+
+
+
 batch_levels = file_metadata$pool_id %>% as.character() %>% unique()
 batch_colors = kelly( length(batch_levels) + 1)[-1] %>% setNames(batch_levels)
 
-pdf(file.path(out_dir, "plots.pdf"))
-  # Downsampled UMAP plot with all samples
+pdf(file.path(out_dir, "batch_qc_plots.pdf"))
+  # UMAP colored by pool(batch)
   set.seed(seed)
   down_size_for_plotting <- min( nrow( cell_metadata ), 100000)
   cell_metadata %>% sample_n(down_size_for_plotting) %>%
@@ -1089,6 +1123,7 @@ pdf(file.path(out_dir, "plots.pdf"))
     theme_classic() + 
     guides(color = guide_legend(override.aes = list(size = 3, alpha=1)))
 
+  # Facetted UMAP by pool(batch)
   plotlist = list()  
   for( b in sort(batch_levels) ) {
     cell_metadata_sub = cell_metadata %>% filter( pool_id == b )
@@ -1104,9 +1139,9 @@ pdf(file.path(out_dir, "plots.pdf"))
   plot_grid_size = get_plot_grid_layout(length(batch_levels))
   ggarrange(plotlist = plotlist, nrow=plot_grid_size$nrow, ncol=plot_grid_size$ncol)
   
-  
+  # If control samples are used
   if( any(file_metadata$control_sample) ) {
-    # Downsampled UMAP plot with only control samples
+    # UMAP by pool(batch) for only control samples
     down_size_for_plotting <- min( nrow( cell_metadata[cell_metadata$control_sample,] ), 100000)
     p <-
       cell_metadata[cell_metadata$control_sample,] %>% sample_n(down_size_for_plotting) %>% 
@@ -1118,7 +1153,7 @@ pdf(file.path(out_dir, "plots.pdf"))
       ggtitle("UMAP (Controls only)")
     print(p)
     
-    # Downsampled UMAP plot with samples other than the control samples
+    # UMAP by pool(batch) for only non-control samples
     down_size_for_plotting <- min( nrow( cell_metadata[ ! cell_metadata$control_sample,] ), 100000)
     p <- 
       cell_metadata[ ! cell_metadata$control_sample,] %>% sample_n(down_size_for_plotting) %>% 
@@ -1136,10 +1171,11 @@ pdf(file.path(out_dir, "plots.pdf"))
   my_palette_reds = colorRampPalette(brewer.pal(n = 9, name = "Reds"))
   breaksList = seq(0, max(log1p(file_by_cluster_freq_norm$Freq)), by = 0.1)
   
-  pheatmap( file_by_cluster_freq_norm %>% 
+  # File x Cluster frequency heatmap
+  p <- pheatmap( file_by_cluster_freq_norm %>% 
               pivot_wider(names_from="file_name",values_from=Freq) %>% 
               column_to_rownames("cluster") %>%
-              log1p(),
+              log1p() %>% as.matrix(),
             annotation_col =
               data.frame(
                 batch = as.character(file_metadata$pool_id),
@@ -1154,11 +1190,12 @@ pdf(file.path(out_dir, "plots.pdf"))
             breaks = breaksList, 
             color = my_palette_reds(length(breaksList)), 
             main = "File x Cluster: cell freq. (norm-log1p)",
-            border_color = NA
+            border_color = NA, silent = T
             )
+  print(p)
 
-
-  pheatmap( file_by_cluster_freq %>% 
+  # Pool(batch) x Cluster frequency heatmap
+  p <- pheatmap( file_by_cluster_freq %>% 
                mutate(pool_id = file_metadata[match( (.)$file_name, file_metadata$file_name),]$pool_id ) %>% 
                mutate(file_name = NULL) %>% 
                group_by(cluster, pool_id) %>% summarise(Freq = sum(Freq)) %>%
@@ -1170,14 +1207,16 @@ pdf(file.path(out_dir, "plots.pdf"))
             breaks = breaksList, 
             color = my_palette_reds(length(breaksList)), 
             main="Batch x Cluster: cell freq. (norm-log1p)",
-            border_color = NA
+            border_color = NA, silent = T
             )
+  print(p)
 
+  # If control samples are used
   if( any( file_metadata$control_sample ) ) {
     control_file_names <- file_metadata %>% filter(control_sample) %>% pull(file_name)
     
-    
-    pheatmap( file_by_cluster_freq %>% filter( file_name %in% control_file_names ) %>% 
+    # Pool(batch) x Cluster frequency heatmap for control-only samples
+    p <- pheatmap( file_by_cluster_freq %>% filter( file_name %in% control_file_names ) %>% 
                 mutate(pool_id = file_metadata[match( (.)$file_name, file_metadata$file_name),]$pool_id ) %>% 
                 mutate(file_name = NULL) %>% 
                 group_by(cluster, pool_id) %>% summarise(Freq = sum(Freq)) %>%
@@ -1189,10 +1228,12 @@ pdf(file.path(out_dir, "plots.pdf"))
               breaks = breaksList, 
               color = my_palette_reds(length(breaksList)), 
               main="Batch x Cluster: cell freq. (norm-log1p) (Controls only)",
-              border_color = NA
+              border_color = NA, silent = T
     )
+    print(p)
     
-    pheatmap( file_by_cluster_freq %>% filter( ! file_name %in% control_file_names ) %>% 
+    # Pool(batch) x Cluster frequency heatmap for non-control-only samples
+    p <- pheatmap( file_by_cluster_freq %>% filter( ! file_name %in% control_file_names ) %>% 
                 mutate(pool_id = file_metadata[match( (.)$file_name, file_metadata$file_name),]$pool_id ) %>% 
                 mutate(file_name = NULL) %>% 
                 group_by(cluster, pool_id) %>% summarise(Freq = sum(Freq)) %>%
@@ -1204,17 +1245,19 @@ pdf(file.path(out_dir, "plots.pdf"))
               breaks = breaksList, 
               color = my_palette_reds(length(breaksList)), 
               main="Batch x Cluster: cell freq. (norm-log1p) (Non-controls only)",
-              border_color = NA
+              border_color = NA, silent = T
     )
+    print(p)
   }
   
   
   
+  # File x Marker(feature) expression (arcsinh and log1p transformed) heatmap
   my_palette_greens = colorRampPalette(brewer.pal(n = 9, name = "Greens"))
   breaksList = seq(0, max(log1p(file_median_exp)), by = 0.1)
   
   markers_for_clustering <- marker_metadata[ match( colnames(file_median_exp), marker_metadata$marker_name), ]$used_for_clustering
-  pheatmap(
+  p <- pheatmap(
             file_median_exp %>% dplyr::select(which(markers_for_clustering)) %>% t() %>% log1p(),
             annotation_col =
               data.frame(
@@ -1232,76 +1275,10 @@ pdf(file.path(out_dir, "plots.pdf"))
             main = "File x Cluster: expression (arcsinh-log1p)",
             border_color = NA
   )
-  
-  dev.off()
-  
+  print(p)
   
   
-  
-  
-
-
-  # DON'T RUN
-  if(FALSE) {
-
-    
-    file_median_exp_z = apply(file_median_exp, 2, scale) %>% t() %>% data.frame() %>% 
-      setNames(row.names(file_median_exp)) %>% na.omit()
-    
-    pal_set3 = colorRampPalette(brewer.pal(12,"Set3"))
-    pal_set1 = colorRampPalette(brewer.pal(9,"Set1"))
-    pool_levels = file_metadata$pool_id %>% unique()
-    donor_levels = file_metadata$donor_id %>% unique()
-    ha = HeatmapAnnotation(
-      pool = file_metadata$pool_id, 
-      donor = file_metadata$donor_id, 
-      col = list(pool = pal_set1( length(pool_levels) ) %>% setNames( pool_levels ),
-                 donor = pal_set3( length(donor_levels) ) %>% setNames( donor_levels )
-      ),
-      na_col = "black"
-    )
-    
-    
-    Heatmap(file_median_exp_z, name = "", top_annotation = ha)
-    
-    
-
-gex_sub = inner_join(rownames_to_column(cell_metadata), rownames_to_column(trans_exp), by=c("rowname" = "rowname")) %>% 
-  sample_n( 10000 )
-
-myf = function(col, gex_sub) {
-  print(col)
-  # Mute the extremely high values.
-  # Get the 0.1%th value and replace all values higher than that by that value and store the values to a new column called "mod_val"
-  limit_val = gex_sub %>% pull(get(col)) %>% quantile(0.999)
-  gex_sub = gex_sub %>% mutate( mod_val = ifelse( get(col) > limit_val, limit_val, get(col) )  )
-  
-  gex_sub %>% 
-    ggplot( aes(x=UMAP1, y=UMAP2, color= mod_val ) ) + 
-    geom_point( alpha=0.25, size=0.1 ) + 
-    scale_color_viridis_c(option="inferno", direction = -1) +
-    labs(x = "UMAP-1", 
-         y = "UMAP-2", 
-         title = col) + 
-    coord_fixed() +
-    theme_classic() +
-    theme(plot.title = element_text(size = 12))
-}
-allPlots = lapply(marker_metadata$marker_name, myf, gex_sub = gex_sub)
-png(file.path(out_dir, "feature_plots.png"), width=20, height=15, units = "in", res=600, pointsize = 4)
-ggarrange(plotlist = allPlots, nrow = 6, ncol = 7)
 dev.off()
-
-
-V(t$graphs[[1]])$tt = 1:62
-t$dataset.statistics$max.marker.vals[["tt"]] = 62
-
-
-
-}
-
-
-
 
 
 
