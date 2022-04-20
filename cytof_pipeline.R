@@ -1027,7 +1027,7 @@ if(CHECKPOINT == 7) {
 
 
 
-cat("Output plots are stored in output directory in ")
+cat("Output plots are stored in output directory in feature_plots.png, split_umap_by_cluster.png, plots.pdf and batch_qc_plots.pdf\n")
 
 library(ggExtra)
 ######### Prelim. Plotting commands
@@ -1052,8 +1052,6 @@ png(file.path(out_dir, "feature_plots.png"), width=20, height=15, units = "in", 
 ggarrange(plotlist = allPlots, nrow = 6, ncol = 7)
 dev.off()
 
-cat("feature_plots.png, ")
-
 
 ## UMAPs split by clusters
 set.seed(1234)
@@ -1072,8 +1070,6 @@ grid_size = get_plot_grid_layout(length(groups))
 png(file.path(out_dir, "split_umap_by_cluster.png"), width=30, height=30, units = "in", res=600, pointsize = 4)
 ggarrange(plotlist=plot_list, ncol=grid_size$ncol, nrow=grid_size$nrow)
 dev.off()
-
-cat("split_umap_by_cluster.png, ")
 
 
 
@@ -1107,7 +1103,6 @@ print(p)
 
 dev.off()
 
-cat("plots.pdf, ")
 
 
 
@@ -1282,7 +1277,6 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
   
 dev.off()
 
-cat("batch_qc_plots.pdf \n")
 
 
 
