@@ -1027,7 +1027,7 @@ if(CHECKPOINT == 7) {
 
 
 
-cat("Output plots are stored in output directory in feature_plots.png, split_umap_by_cluster.png, plots.pdf and batch_qc_plots.pdf\n")
+print_message("Output plots are stored in the output directory in feature_plots.png, split_umap_by_cluster.png, plots.pdf and batch_qc_plots.pdf\n")
 
 library(ggExtra)
 ######### Prelim. Plotting commands
@@ -1092,13 +1092,13 @@ cell_metadata_sub %>%
 # Average gene expression heatmap (unscaled)
 cluster_median_exp_tmp = cluster_median_exp[ , marker_metadata$marker_name[marker_metadata$used_for_clustering] ]
 p <- pheatmap( cluster_median_exp_tmp, clustering_method="ward.D2", main="Archsinh-transformed expression (unscaled)", silent = T )
-print(p)
+print(p[[4]])
 
 # Average gene expression heatmap (marker-wise scaled)
 cluster_median_exp_s = apply( cluster_median_exp_tmp, 2, scale)
 rownames(cluster_median_exp_s) = rownames(cluster_median_exp_tmp)
 p <- pheatmap( cluster_median_exp_s, clustering_method="ward.D2", main="Archsinh-transformed expression (column-scaled)", silent = T )
-print(p)
+print(p[[4]])
 
 dev.off()
 
@@ -1188,7 +1188,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
             main = "File x Cluster: cell freq. (norm-log1p)",
             border_color = NA, silent = T
             )
-  print(p)
+  print(p[[4]])
 
   # Pool(batch) x Cluster frequency heatmap
   p <- pheatmap( file_by_cluster_freq %>% 
@@ -1205,7 +1205,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
             main="Batch x Cluster: cell freq. (norm-log1p)",
             border_color = NA, silent = T
             )
-  print(p)
+  print(p[[4]])
 
   # If control samples are used
   if( any( file_metadata$control_sample ) ) {
@@ -1226,7 +1226,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
               main="Batch x Cluster: cell freq. (norm-log1p) (Controls only)",
               border_color = NA, silent = T
     )
-    print(p)
+    print(p[[4]])
     
     # Pool(batch) x Cluster frequency heatmap for non-control-only samples
     p <- pheatmap( file_by_cluster_freq %>% filter( ! file_name %in% control_file_names ) %>% 
@@ -1243,7 +1243,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
               main="Batch x Cluster: cell freq. (norm-log1p) (Non-controls only)",
               border_color = NA, silent = T
     )
-    print(p)
+    print(p[[4]])
   }
   
   
@@ -1271,7 +1271,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
             main = "File x Cluster: expression (arcsinh-log1p)",
             border_color = NA
   )
-  print(p)
+  print(p[[4]])
   
   
 dev.off()
