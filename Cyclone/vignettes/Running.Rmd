@@ -130,6 +130,8 @@ How to create:
 fill in the config.yml file, saving it with whatever name you would like.
 We will use "my_config.yml".
 
+#### Notes on Parallelization
+
 ## Running the Pipeline
 
 Once everything is set up:
