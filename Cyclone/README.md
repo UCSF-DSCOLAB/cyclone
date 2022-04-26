@@ -1,5 +1,6 @@
-## Instructions for helping develop this package
-By Dan
+# CyTOF CLustering Optimization aNd Evaluation (Cyclone)
+
+Instructions by Dan are for anyone who wants to help develop this package
 
 # To help develop this package with RStudio:
 
@@ -18,7 +19,13 @@ Of course, we won't be doing that exactly here... most of our documentation chun
 You can check out [the dittoSeq repo](https://github.com/dtm2451/dittoSeq/tree/master/R) for some of my other examples, or the roxygen2 vignettes [here](https://cran.r-project.org/web/packages/roxygen2/vignettes/roxygen2.html).
 
 ### Building the documentation:
-How the project is set up, documentation is re-built any time that the 'Build ...' or 'Check' actions are made (More on those below). That's what I end up relying on mostly in dittoSeq dev, but you can also use `roxygen2::roxygenise()`, `devtools::build()`, or `Ctrl + Shift + D`!
+How the project is set up, documentation is re-built any time that the `'Build ...'` or `'Check'` actions are made (More on those below). That's what I end up relying on mostly in dittoSeq dev, but you can also use `roxygen2::roxygenise()`, `devtools::build()`, or `Ctrl + Shift + D`!
+
+## Writing the Vignette:
+It's an `.Rmd` file in the `vignettes` folder.  Rmd files give a rendered text md format surrounding code chunks that can be controlled with arguments provided to the \`\`\`{r} that they start with.
+
+### Building the vignette:
+With the `.Rmd` open, click the `Knit` button in the menu bar of the editor panel. 
 
 ## Building / Checking / Installation
 Build tools are in the top right panel of RStudio, in the `Build` tab.
@@ -26,7 +33,7 @@ Build tools are in the top right panel of RStudio, in the `Build` tab.
 The 3 actions I use most often:
 - Build a source version of the package with `More > Build Source Package`
 - Install from the source version ^^ will build with the `Install and Restart`
-- The `Check` button performs lots of tests and is probably what I've relied on most.
+- Run Checks: The `Check` button performs lots of tests and is probably what I've relied on most of anything.
 
 To view the documentation yourself, Build, then install, then `?<target_docs>`
 
