@@ -1,0 +1,159 @@
+---
+title: Running the CyTOF Pipeline
+author:
+- name: Daniel Bunis
+  affiliation: UCSF DSCoLab
+  email: daniel.bunis@ucsf.edu
+date: "Apr 9th, 2022"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+package: Cyclone
+vignette: >
+  %\VignetteIndexEntry{Running the Pipeline}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}    
+---
+
+```{r, echo=FALSE, results="hide", message=FALSE}
+knitr::opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE,
+    dev="jpeg", dpi = 72, fig.width = 4.5, fig.height = 3.5)
+```
+
+# Introduction
+
+This pipeline ...
+
+## Starting point
+
+To get started with this pipeline, you should have:
+- A folder containing fcs files from cytof data
+- sample metadata
+- marker metadata
+- tsv(/csv?) of grid sizes
+
+## What this pipeline does do
+
+- Chunks work of the steps below accross 8 'checkpoints'
+- Calculates UMAP embeddings
+- Performs clustering with FlowSOM (first, over an optimization space to allow users to pick their ideal parameters. Then, with user-chosen parameters)
+- Calculates and outputs various metrics:
+  - Per cluster: median expression of all markers
+  - ... 
+
+## What this pipeline does NOT do
+
+The pipeline assumes you have already performed any of the below pre-processing steps which would have been necessary for your data:
+- debarcoding
+- bead normalization
+- batch correction
+
+OPTIONALLY, if your data has been batch corrected by a method that does not output corrected fcs files, and only outputs a corrected matrix...
+
+## Setup
+
+To run the pipeline, you first need to:
+
+- Install all required packages
+- Choose or create an intended output directory
+- Create a set of metadata files:
+  - sample_metadata
+  - file_metadata
+  - marker_metadata
+- Finalize your config.yml file.
+
+### Installing FlosSOM and other dependencies
+
+Simply installing this <package-name> counterpart will take care of most required installations.
+You can install from github with:
+
+```{r, eval = FALSE}
+if (!requireNamespace("remotes")) {
+    install.packages("remotes")
+}
+remotes::install_github("ravipatel4/CyTOF_pipeline", subdir = "dscoSOM")
+```
+
+Some packages are not absolutely required, so we leave to the user whether to install them.
+If you want them, you will need to install them yourself:
+
+- Scaffold
+
+<We could still give instructions..>
+
+
+### Choosing an output directory
+
+...
+
+### Sample Metadata
+
+Columns | Contents
+--- | ---
+col1 | desc
+
+How it's used:
+
+How to create:
+
+### File Metadata
+
+Columns | Contents
+--- | ---
+col1 | desc
+
+How it's used:
+
+How to create:
+
+### Marker Metadata
+
+Columns | Contents
+--- | ---
+col1 | desc
+
+How it's used:
+
+How to create:
+
+### Config.yml File
+
+The file directs the pipeline to find all inputs, and is the main point of control for how the pipeline will be run.
+
+Structure:
+
+Contents:
+
+Template:
+
+How to create:
+fill in the config.yml file, saving it with whatever name you would like.
+We will use "my_config.yml".
+
+#### Notes on Parallelization
+
+## Running the Pipeline
+
+Once everything is set up:
+
+1. Run the pipeline and put it to your config.yml.
+
+```
+Rscript cytof_pipeline.R config.yml
+```
+
+### Checkpoints
+
+The pipeline is broken down into multiple chunks, where each chunk saves its output as a checkpoint.Rdata file.
+
+
+
+
+
+
+
+# Other things we'll want to hit on
+
+Parallelization
+Processing requirements (per checkpoint?)
+Afterwards... maybe a second vignette for visualization and exploration of the outputs!
