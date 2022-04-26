@@ -1,4 +1,4 @@
-# CyTOF_pipeline
+# <ins>Cy</ins>TOF <ins>CL</ins>ustering <ins>O</ins>ptimization a<ins>N</ins>d <ins>E</ins>valuation (Cyclone) ???
 
 ## Direct contribution instructions 
 1. Clone the repo.
@@ -8,4 +8,4 @@
 6. Push your branch back to the repo with `git push origin HEAD -u`.
 7. Create a Pull Request into the `main` branch, describe your changes in the description.
 
-You can also contibute by describing any bugs by opening up an `Issue` above!
+You can also contribute by describing any bugs by opening up an `Issue` above!
