@@ -179,14 +179,13 @@ grid_optimization_plots <- function(flowsom_out) {
 
 
 
-#' run_flowsom
-#' @description Perform clustering 
+#' run_flowsom_optimization
+#' @description Perform FlowSOM clustering optimization and generate a plot of cluster number vs DBI.
 #' @param trans_exp_submarkers data frame of transformed expression of markers (columns) to be used for clustering.
 #' @param clust_params list containing clustering parameters. See the function call below to understand how this list is made (using prep_param_list function).
 #' @param xdim a single xdim value or a vector of xdim values
 #' @param xdim a single ydim value or a vector of ydim values, there has to be same number of xdim and ydim values.
-#' @param optimize_grid a boolean indicating whether the current function call is for optimizing the grid sizes. If TRUE, the DBI values are calculated for each grid size and a plot of cluster number vs DBI is generated. The clustering labels are not saved. If FALSE, the cluster labels are saved for each grid size; the DBI is not calculated.
-run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize_grid) {
+run_flowsom_optimization <- function(trans_exp_submarkers, clust_params, xdim, ydim) {
 
   if(length(xdim) != length(ydim)) {
     print_message("Fatal error: The number of xdim and ydim values are not the same. Make sure the input is correct and rerun the pipeline. Exiting.")
@@ -204,6 +203,9 @@ run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize
   if(nthreads == -1)
     nthreads = parallel::detectCores() - 1
   
+  # If xdim is very small, use length of xdim for nthreads
+  nthreads = min(length(xdim), nthreads)
+  
   if(nthreads > 1) {
     my.cluster <- parallel::makeCluster(
       nthreads, 
@@ -211,56 +213,72 @@ run_flowsom <- function(trans_exp_submarkers, clust_params, xdim, ydim, optimize
     )
     # Register the parallel processes. 
     doParallel::registerDoParallel(cl = my.cluster)
-  }
   
-  flowsom_out <- foreach(i = 1:length(xdim)) %dopar% {
-    cstart = Sys.time()
-    print_message(paste0("FlowSOM clustering begins for grid: ", xdim[i], "x", ydim[i] ))
-    fSOM <- FlowSOM(my_flowframe,
-                    # Input options:
-                    compensate = FALSE,
-                    transform = FALSE,
-                    scale = FALSE,
-                    # SOM options:
-                    xdim = xdim[i], ydim = ydim[i],
-                    # Metaclustering options:
-                    nClus = clust_params$k,
-                    silent = FALSE)
-    cend = Sys.time()
-    print_message(paste0("Clustering completed for grid: ", xdim[i], "x", ydim[i] ))
-    ctime = as.numeric(difftime(cend, cstart, units="mins"))
-    
-    fSOM$data = NULL
-    
-    if(clust_params$meta_cluster) {
-      clusters = as.vector(GetMetaclusters(fSOM))
+    flowsom_out <- foreach(i = 1:length(xdim)) %dopar% {
+      run_flowsom(my_flowframe, clust_params, xdim[i], ydim[i], optimize_grid = TRUE)
     }
-    else {
-      clusters = as.vector(GetClusters(fSOM))
-    }
-    
-    if(optimize_grid) {
-      DBI_obj = index.DB(trans_exp_submarkers, as.numeric(clusters) )
-      DBI = DBI_obj$DB
-      list("xdim" = xdim[i], "ydim" = ydim[i], "ctime" = ctime, "DBI" = DBI)
-    } else {
-      list("clusters" = clusters, "clust_obj" = fSOM, "xdim" = xdim[i], "ydim" = ydim[i], "ctime" = ctime)
+  } else {
+    flowsom_out <- foreach(i = 1:length(xdim)) %do% {
+      run_flowsom(my_flowframe, clust_params, xdim[i], ydim[i], optimize_grid = TRUE)
     }
   }
   
   # Add the grid ids to each element of flowsom_out
   names(flowsom_out) = paste0("cluster_", xdim, "x", ydim)
   
-  if(optimize_grid) {
-    grid_optimization_plots(flowsom_out = flowsom_out)
-    return()
-  } else {
-    return(flowsom_out)
-  }
+  grid_optimization_plots(flowsom_out = flowsom_out)
+  return()
 }
 
 
 
+
+
+#' run_flowsom
+#' @description Perform FlowSOM clustering for the given single grid
+#' @param my_flowframe flowframe of transformed expression of markers (columns) to be used for clustering.
+#' @param clust_params list containing clustering parameters. See the function call below to understand how this list is made (using prep_param_list function).
+#' @param xdim a single xdim value
+#' @param xdim a single ydim value
+#' @param optimize_grid a boolean indicating whether the current function call is for optimizing the grid sizes. If TRUE, the DBI values are calculated for each grid size. The clustering labels are not saved. If FALSE, the cluster labels are saved for each grid size; the DBI is not calculated.
+run_flowsom <- function(my_flowframe, clust_params, xdim, ydim, optimize_grid) {
+
+  cstart = Sys.time()
+  print_message(paste0("FlowSOM clustering begins for grid: ", xdim, "x", ydim ))
+  fSOM <- FlowSOM(my_flowframe,
+                  # Input options:
+                  compensate = FALSE,
+                  transform = FALSE,
+                  scale = FALSE,
+                  # SOM options:
+                  xdim = xdim, ydim = ydim,
+                  # Metaclustering options:
+                  nClus = clust_params$k,
+                  silent = FALSE,
+                  colsToUse = colnames(my_flowframe))
+  cend = Sys.time()
+  print_message(paste0("Clustering completed for grid: ", xdim, "x", ydim ))
+  ctime = as.numeric(difftime(cend, cstart, units="mins"))
+  
+  fSOM$data = NULL
+  
+  if(clust_params$meta_cluster) {
+    clusters = as.vector(GetMetaclusters(fSOM))
+  }
+  else {
+    clusters = as.vector(GetClusters(fSOM))
+  }
+  
+  out_list = list()
+  if(optimize_grid) {
+    DBI_obj = index.DB(trans_exp_submarkers, as.numeric(clusters) )
+    DBI = DBI_obj$DB
+    out_list = list("xdim" = xdim, "ydim" = ydim, "ctime" = ctime, "DBI" = DBI)
+  } else {
+    out_list = list("clusters" = clusters, "clust_obj" = fSOM, "xdim" = xdim, "ydim" = ydim, "ctime" = ctime)
+  }
+  return(out_list)
+}
 
 
 
@@ -401,6 +419,12 @@ print_step_startup_msg <- function() {
 
 # Load config parameters
 config <- read.config(file = config_file)
+if(is.logical(config)) {
+  if(config == FALSE) {
+    print_message(paste("Fatal error: the configuration YAML file has formating issues. Exiting."))
+    quit(save = "no", status = 1)
+  }
+}
 for( x in names(config) ) {
   assign(x, config[[x]])
 }
@@ -699,7 +723,7 @@ if(CHECKPOINT == 2) {
   # Optimization
   if( clustering_method == "flowsom") {
     print_message("Optimization Begins:")
-    optimization_res = run_flowsom(trans_exp_submarkers, flowsom_params, xdim, ydim, optimize_grid = TRUE)
+    optimization_res = run_flowsom_optimization(trans_exp_submarkers, flowsom_params, xdim, ydim)
     print_message("Optimization completed.")
   }
   else if( clustering_method == "clara") {
@@ -747,7 +771,18 @@ if(CHECKPOINT == 3) {
       xdim <- flowsom_params$xdim
       ydim <- flowsom_params$ydim
     }
-    clust_res = run_flowsom(trans_exp_submarkers, flowsom_params, xdim, ydim, optimize_grid = FALSE)
+    if(length(xdim) != length(ydim)) {
+      print_message("Fatal error: The number of xdim and ydim values provided using comma-separated list are not the same. Make sure the input is correct and rerun the pipeline. Exiting.")
+      quit(save = "no", status = 1)
+    }
+    print_message("Preparing the flowFrame for input to FlowSOM: ")
+    my_flowframe = flowCore::flowFrame(as.matrix(trans_exp_submarkers))
+    print_message("Starting the FlowSOM clustering: ")
+    
+    clust_res = list()
+    for(i in 1:length(xdim)) {
+      clust_res[[paste0("cluster_", xdim[i], "x", ydim[i])]] = run_flowsom(my_flowframe, flowsom_params, xdim[i], ydim[i], optimize_grid = FALSE)
+    }
     # Storing clustering results in variables.
     cell_metadata$cluster <- as.character(clust_res[[1]]$clusters)
     cell_metadata = cbind(cell_metadata, 
