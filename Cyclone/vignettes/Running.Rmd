@@ -1,9 +1,15 @@
 ---
 title: Running the CyTOF Pipeline
 author:
-- name: Daniel Bunis, Rebecca Jaszczak
+- name: Daniel Bunis
   affiliation: UCSF DSCoLab
-  email: daniel.bunis@ucsf.edu, rebecca.jaszczak@ucsf.edu
+  email: daniel.bunis@ucsf.edu
+- name: Rebecca Jaszczak
+  affiliation: UCSF DSCoLab
+  email: rebecca.jaszczak@ucsf.edu
+- name: Ravi Patel
+  affiliation: UCSF DSCoLab
+  email: ravi.patel2@ucsf.edu
 date: "Apr 9th, 2022"
 output:
   BiocStyle::html_document:
