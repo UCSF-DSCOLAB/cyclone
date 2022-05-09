@@ -137,9 +137,10 @@ If you are submitting on a shared compute cluster, here is a suggested workflow:
   1. Structure your initial job call to have one more thread than you will assign in `config.yml`.
     a. E.g., if you intend to parallel process over 4 cores, request 5 cores from your scheduler.
     b. In the same example, ensure that `nthreads: 4` value is assigned in `config.yml`
-  2. Allocate a sufficient number of scratch for larger datasets (eg, over 20 million cells)
+  2. Larger datasets (over 20 million cells) may need to allocate scratch directories, e.g. `--gres=scratch:500G`, pending cluster requirements.
   3. Request enough RAM for the number of cells contained in your dataset.
-    a.  As structured currently, R will split the total amount of RAM passed in your job to each of the processes requested in `config.yml`
+    a. As structured currently, R will split the total amount of RAM passed in your job to each of the processes requested in `config.yml`
+    b. We have used ~300Gb RAM for ~20 million cells, and ~420Gb RAM for ~40 million cells. This may vary based on your computer/cluster specs.
 
 If processing in parallel, please note that there will be no log messages `FlowSOM clustering begins for grid...` after you have received the `Starting the FlowSOM clustering...` message.
   
