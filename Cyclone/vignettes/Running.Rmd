@@ -4,6 +4,12 @@ author:
 - name: Daniel Bunis
   affiliation: UCSF DSCoLab
   email: daniel.bunis@ucsf.edu
+- name: Rebecca Jaszczak
+  affiliation: UCSF DSCoLab
+  email: rebecca.jaszczak@ucsf.edu
+- name: Ravi Patel
+  affiliation: UCSF DSCoLab
+  email: ravi.patel2@ucsf.edu
 date: "Apr 9th, 2022"
 output:
   BiocStyle::html_document:
@@ -71,7 +77,7 @@ You can install from github with:
 if (!requireNamespace("remotes")) {
     install.packages("remotes")
 }
-remotes::install_github("ravipatel4/CyTOF_pipeline", subdir = "dscoSOM")
+remotes::install_github("ravipatel4/CyTOF_pipeline", subdir = "Cyclone")
 ```
 
 Some packages are not absolutely required, so we leave to the user whether to install them.
@@ -132,6 +138,18 @@ We will use "my_config.yml".
 
 #### Notes on Parallelization
 
+If you are submitting on a shared compute cluster, here is a suggested workflow:
+  
+  1. Structure your initial job call to have one more thread than you will assign in `config.yml`.
+    a. E.g., if you intend to parallel process over 4 cores, request 5 cores from your scheduler.
+    b. In the same example, ensure that `nthreads: 4` value is assigned in `config.yml`
+  2. Larger datasets (over 20 million cells) may need to allocate scratch directories, e.g. `--gres=scratch:500G`, pending cluster requirements.
+  3. Request enough RAM for the number of cells contained in your dataset.
+    a. As structured currently, R will split the total amount of RAM passed in your job to each of the processes requested in `config.yml`
+    b. We have used ~300Gb RAM for ~20 million cells, and ~420Gb RAM for ~40 million cells. This may vary based on your computer/cluster specs.
+
+If processing in parallel, please note that there will be no log messages `FlowSOM clustering begins for grid...` after you have received the `Starting the FlowSOM clustering...` message.
+  
 ## Running the Pipeline
 
 Once everything is set up:
