@@ -44,7 +44,15 @@ To get started with this pipeline, you should have:
 2) Calculates UMAP embeddings
 3) Performs clustering with FlowSOM (first, over an optimization space to allow users to pick their ideal parameters. Then, with user-chosen parameters)
 4) Calculates and outputs various metrics
-- Checkpoints 1-8, and their accompanying data matrices
+- Checkpoints 1-8
+  - Read, preprocess and transform the data. Output: `checkpoint_1.RData`
+  - Calculate UMAP. Output: `checkpoint_2.RData`
+  - Optimize clustering parameters. Output: `heckpoint_3.RData` & `clustering_param_optimization.pdf`
+  - Perform clustering. Output: `checkpoint_4.RData`
+  - Generate various matrices. Output: `checkpoint_5.RData`
+  - Prepare input files for SCAFFoLD analysis. Output: `checkpoint_6.RData`
+  - Generate SCAFFoLD map. Output: `checkpoint_7.RData`
+  - Produce final set of visualizations. Output: `checkpoint_8.RData` and plots below
 - Plots output:
   - `clustering_param_optimization.pdf` - DBI x cluster counts graph
   - `feature_plots.png` - a set list of markers helpful for cell type identification
