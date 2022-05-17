@@ -1,12 +1,10 @@
 # Running the CyTOF Pipeline
-{:.no_toc}
 
-<p class="author-name">Daniel Bunis<span class="affil-mark">1\*</span>, Rebecca Jaszczak<span class="affil-mark">1\*\*</span> and Ravi Patel<span class="affil-mark">1\*\*\*</span></p>
+<p class="author-name">Daniel Bunis<span class="affil-mark">1</span>, Rebecca Jaszczak<span class="affil-mark">1§§</span> and Ravi Patel<span class="affil-mark">1§§§</span></p>
 <p class="author-affiliation"><span class="affil-mark">1</span>UCSF DSCoLab</p>
-<p class="author-email"><span class="affil-mark">\*</span><a href="mailto:daniel.bunis@ucsf.edu">daniel.bunis@ucsf.edu</a><br><span class="affil-mark">\*\*</span><a href="mailto:rebecca.jaszczak@ucsf.edu">rebecca.jaszczak@ucsf.edu</a><br><span class="affil-mark">\*\*\*</span><a href="mailto:ravi.patel2@ucsf.edu">ravi.patel2@ucsf.edu</a></p>
+<p class="author-email"><span class="affil-mark">§</span><a href="mailto:daniel.bunis@ucsf.edu">daniel.bunis@ucsf.edu</a><br><span class="affil-mark">§§</span><a href="mailto:rebecca.jaszczak@ucsf.edu">rebecca.jaszczak@ucsf.edu</a><br><span class="affil-mark">§§§</span><a href="mailto:ravi.patel2@ucsf.edu">ravi.patel2@ucsf.edu</a></p>
 
 ## Contents
-{:.no_toc}
 
 -   [Introduction](#introduction)
     -   [Starting point](#starting-point)
@@ -26,7 +24,6 @@
     -   [Output Checkpoints 1-8](#output-checkpoints-1-8)
         -   [Plots output:](#plots-output)
 -   [WIP](#wip)
-{:toc}
 
 ## Introduction
 
