@@ -39,10 +39,10 @@ prepare_checkpoint1 <- function(
   exclude_controls = FALSE
 ) {
   # Check that raw_exp and trans_exp (if provided) are numeric
-  if(!is.null(raw_exp) & !all(sapply(raw_exp, is.numeric)) ) {
+  if(!is.null(raw_exp) && !all(sapply(raw_exp, is.numeric)) ) {
     stop("At least on column of raw_exp is non-numeric. Make sure all columns are numeric.")
   }
-  if(!is.null(trans_exp) & !all(sapply(trans_exp, is.numeric)) ) {
+  if(!is.null(trans_exp) && !all(sapply(trans_exp, is.numeric)) ) {
     stop("At least on column of trans_exp is non-numeric. Make sure all columns are numeric.")
   }
   # Check at least one of raw_exp and trans_exp is provided.
@@ -135,7 +135,7 @@ prepare_checkpoint1 <- function(
   }
 
   # Generate checkpoint_1.RData in out_dir
+  cat("Outputting checkpoint_1.Rdata, targeting", nrow(trans_exp), "cells.\n"))
   CHECKPOINT <- 1
   save(CHECKPOINT, raw_exp, trans_exp, cell_metadata, file_metadata, marker_metadata, file=file.path(out_dir,"checkpoint_1.RData"))
 }
-
