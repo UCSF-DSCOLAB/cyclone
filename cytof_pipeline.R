@@ -593,7 +593,7 @@ if(CHECKPOINT == 0) {
       
       # Subsampling if subsample == TRUE
       if(subsample) {
-        tmp_raw_exp <- sample_n(tmp_raw_exp, subsample_n, replace=TRUE)
+        tmp_raw_exp <- sample_n(tmp_raw_exp, min(subsample_n, nrow(tmp_raw_exp)), replace=FALSE)
       }
       
         
