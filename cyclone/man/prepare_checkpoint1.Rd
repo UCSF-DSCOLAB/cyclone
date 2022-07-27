@@ -26,8 +26,8 @@ prepare_checkpoint1(
 \item file_name: unique names of file/sample
 \item donor_id: identifier indicating the donor of the sample (used only for visualization)
 \item pool_id: CyTOF pool id or batch id (used only for visualization)
-\item control_sample: TRUE/FALSE indicating whether the file/sample is a batch control, as often used in CyTOF.  (used only for visualization when starting the pipeline from step 2)
-\item any additional metadata columns will not be used only for anything internal to cyclone, but they copied to the output objects for easy access.
+\item control_sample: TRUE/FALSE indicating whether the file/sample is a batch control, as often used in CyTOF.  (used for visualization & 'exclude_controls' functionality)
+\item any additional metadata columns will not be used for anything internal to cyclone, but they will be copied to other outputs for easy access.
 }}
 
 \item{marker_metadata}{data frame listing all markers/features, one per row. Must have following columns: \itemize{
@@ -50,6 +50,9 @@ prepare_checkpoint1(
 \item{subsample_n}{Positive Integer. The maximum number of cells to retain per sample when \code{subsample = TRUE}}
 
 \item{exclude_controls}{Logical. Whether to remove samples from the dataset that are marked as controls in \code{file_metadata}}
+}
+\value{
+None directly. Outputs are written to a file, "checkpoint_1.RData" in \code{out_dir}.
 }
 \description{
 Checks if the data is provided in a correct format and generates checkpoint_1.RData in out_dir

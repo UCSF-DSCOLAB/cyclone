@@ -8,8 +8,8 @@
 #' \item file_name: unique names of file/sample
 #' \item donor_id: identifier indicating the donor of the sample (used only for visualization)
 #' \item pool_id: CyTOF pool id or batch id (used only for visualization)
-#' \item control_sample: TRUE/FALSE indicating whether the file/sample is a batch control, as often used in CyTOF.  (used only for visualization when starting the pipeline from step 2)
-#' \item any additional metadata columns will not be used only for anything internal to cyclone, but they copied to the output objects for easy access.
+#' \item control_sample: TRUE/FALSE indicating whether the file/sample is a batch control, as often used in CyTOF.  (used for visualization & 'exclude_controls' functionality)
+#' \item any additional metadata columns will not be used for anything internal to cyclone, but they will be copied to other outputs for easy access.
 #' }
 #' @param marker_metadata   data frame listing all markers/features, one per row. Must have following columns: \itemize{
 #' \item marker_name: marker names, must match the column names of raw_exp and trans_exp
@@ -25,6 +25,7 @@
 #' @param subsample Logical. Whether to downsample by retaining up to \code{subsample_n} number of randomly selected cells per sample
 #' @param subsample_n Positive Integer. The maximum number of cells to retain per sample when \code{subsample = TRUE}
 #' @param exclude_controls Logical. Whether to remove samples from the dataset that are marked as controls in \code{file_metadata}
+#' @return None directly. Outputs are written to a file, "checkpoint_1.RData" in \code{out_dir}.
 
 prepare_checkpoint1 <- function(
   raw_exp=NULL,
@@ -135,7 +136,7 @@ prepare_checkpoint1 <- function(
   }
 
   # Generate checkpoint_1.RData in out_dir
-  cat("Outputting checkpoint_1.Rdata, targeting", nrow(trans_exp), "cells.\n"))
+  cat("Outputting checkpoint_1.Rdata, targeting", nrow(trans_exp), "cells.\n")
   CHECKPOINT <- 1
   save(CHECKPOINT, raw_exp, trans_exp, cell_metadata, file_metadata, marker_metadata, file=file.path(out_dir,"checkpoint_1.RData"))
 }
