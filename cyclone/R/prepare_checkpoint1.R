@@ -125,7 +125,7 @@ prepare_checkpoint1 <- function(
           sample(cells_in_sample, min(subsample_n, length(cells_in_sample)), replace = FALSE)
         }
       ))
-      cell_metadata <- cells_metadata[rownames(cell_metadata) %in% cells_use,]
+      cell_metadata <- cell_metadata[rownames(cell_metadata) %in% cells_use,]
     }
     # Trim data matrices
     trans_exp <- trans_exp[rownames(cell_metadata),]
