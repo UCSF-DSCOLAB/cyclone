@@ -1096,7 +1096,11 @@ ggarrange(plotlist = allPlots, nrow = 6, ncol = 7)
 dev.off()
 
 
-pdf(file.path(out_dir, "plots.pdf"))
+pdf(file.path(out_dir, "plots.pdf"),
+    # scale by the numbers of markers and clusters to ensure visibility
+    w = min(5, 1.5+0.14*sum(marker_metadata$used_for_clustering)),
+    h = min(5, 2+0.14*length(cluster_levels))
+)
 
 # UMAP colored by clusters
 set.seed(1234)
@@ -1109,7 +1113,8 @@ cell_metadata_sub %>%
   theme_classic() +
   scale_color_manual(values=cluster_colors) +
   guides(color=guide_legend(override.aes=list(size=2, alpha=1))) +
-  geom_text(data=label_cell_meta, aes(label=cluster), color="black")
+  geom_text(data=label_cell_meta, aes(label=cluster), color="black") +
+  theme(aspect.ratio = 1, legend.position="none")
 
 
 # Average gene expression heatmap (unscaled)
