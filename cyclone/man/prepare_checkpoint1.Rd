@@ -14,6 +14,7 @@ prepare_checkpoint1(
   arcsinh_cofactor = 5,
   subsample = FALSE,
   subsample_n = 4000,
+  subsample_seed = 123,
   exclude_controls = FALSE
 )
 }
@@ -48,6 +49,8 @@ prepare_checkpoint1(
 \item{subsample}{Logical. Whether to downsample by retaining up to \code{subsample_n} number of randomly selected cells per sample}
 
 \item{subsample_n}{Positive Integer. The maximum number of cells to retain per sample when \code{subsample = TRUE}}
+
+\item{subsample_seed}{Integer or NULL. For reproducibility purposes, when not NULL, this value is presented to a call to set.seed() prior to performing the random subsampling.}
 
 \item{exclude_controls}{Logical. Whether to remove samples from the dataset that are marked as controls in \code{file_metadata}}
 }

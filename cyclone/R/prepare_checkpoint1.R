@@ -24,6 +24,7 @@
 #' @param arcsinh_cofactor  cofactor to use during ArcSinh transformation. If trans_exp is provided, this value is ignored.
 #' @param subsample Logical. Whether to downsample by retaining up to \code{subsample_n} number of randomly selected cells per sample
 #' @param subsample_n Positive Integer. The maximum number of cells to retain per sample when \code{subsample = TRUE}
+#' @param subsample_seed Integer or NULL. For reproducibility purposes, when not NULL, this value is presented to a call to set.seed() prior to performing the random subsampling.
 #' @param exclude_controls Logical. Whether to remove samples from the dataset that are marked as controls in \code{file_metadata}
 #' @return None directly. Outputs are written to a file, "checkpoint_1.RData" in \code{out_dir}.
 
@@ -37,6 +38,7 @@ prepare_checkpoint1 <- function(
   arcsinh_cofactor=5,
   subsample = FALSE,
   subsample_n = 4000,
+  subsample_seed = 123,
   exclude_controls = FALSE
 ) {
   # Check that raw_exp and trans_exp (if provided) are numeric
@@ -119,6 +121,9 @@ prepare_checkpoint1 <- function(
     }
     # Subsampling if subsample == TRUE
     if (subsample) {
+      if (!is.null(subsample_seed)) {
+          set.seed(subsample_seed)
+      }
       cells_use <- unlist(lapply(
         file_metadata$file_name,
         function(file) {
