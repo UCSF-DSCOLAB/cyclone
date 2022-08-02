@@ -1098,8 +1098,8 @@ dev.off()
 
 pdf(file.path(out_dir, "plots.pdf"),
     # scale by the numbers of markers and clusters to ensure visibility
-    w = min(5, 1.5+0.14*sum(marker_metadata$used_for_clustering)),
-    h = min(5, 2+0.14*length(cluster_levels))
+    w = max(5, 1.5+0.14*sum(marker_metadata$used_for_clustering)),
+    h = max(5, 2+0.14*length(cluster_levels))
 )
 
 # UMAP colored by clusters
