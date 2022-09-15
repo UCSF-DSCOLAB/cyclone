@@ -587,7 +587,7 @@ if(CHECKPOINT == 0) {
       #    mutate( desc = fcs_param_data[ match( marker_metadata$channel_name, fcs_param_data$name), ]$desc )
       #  is_first_file = FALSE
       #}
-      tmp_raw_exp <- tmp_fcs_data@exprs %>% data.frame() %>% dplyr::select(marker_metadata$channel_name) # Convert @exprs to a data frame
+      tmp_raw_exp <- tmp_fcs_data@exprs %>% data.frame(check.names = FALSE) %>% dplyr::select(marker_metadata$channel_name) # Convert @exprs to a data frame
       # Remove cells containing Inf values
       tmp_raw_exp <- tmp_raw_exp[!is.infinite(rowSums(tmp_raw_exp)),]
 
