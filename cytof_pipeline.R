@@ -496,6 +496,7 @@ for(x in names(param_list)) {
     }
   }
 }
+old_new_val_msg <- paste(old_new_val_msg, collapse = "")
 if( old_new_val_msg != "") {
   print_message( paste0("New values were supplied for the following parameters:") )
   print_message( old_new_val_msg )
