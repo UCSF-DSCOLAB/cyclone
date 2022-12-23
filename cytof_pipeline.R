@@ -537,15 +537,38 @@ if( dir.exists( scaffold_dir ) & CHECKPOINT < 5 ) {
 }
 
 # Don't make SCAFFoLD map, unless the gated populations are provided.
-make_scaffold_map <- FALSE
+make_scaffold_map <- NULL
 if( dir.exists(gated_fcs_dir) ) {
   dir.create(file.path(scaffold_dir, "gated"), showWarnings = TRUE )
   gated_fcss <- list.files(gated_fcs_dir, full.names = TRUE, pattern = ".fcs$")
-  copy_gated_fcss <- file.copy(gated_fcss, file.path(scaffold_dir, "gated"), overwrite = TRUE)
-  if( sum(copy_gated_fcss) > 0 ) {
-    make_scaffold_map <- TRUE
-  } else {
-    print_message("Could not copy any FCS files from the gated population directory. SCAFFoLD map generation will be skipped.")
+  
+  for(gf_file in gated_fcss){ 
+    tmp_fcs = read.FCS(gf_file)
+    tmp_fcs@parameters@data = 
+      tmp_fcs@parameters@data %>% 
+      mutate(desc = marker_metadata$marker_name[match( name, marker_metadata$channel_name )] )
+    nacount_desc = sum(
+      is.na(
+        tmp_fcs@parameters@data$desc[ 
+          tmp_fcs@parameters@data$name %in% marker_metadata$channel_name[marker_metadata$used_for_scaffold] 
+          ]
+        )
+      )
+    if(nacount_desc > 0) {
+      print_message(paste0(nacount_desc, " marker(s) used_for_scaffold in marker_metadata do not exist in the following gated FCS file (", gf_file ,"). Hence, SCAFFoLD steps will be skipped. Please make sure the channel_name of all used_for_scaffold markers in marker_metadata exist in the gated FCS files (\"name\" column of parameters@data slot) and rerun the SCAFFoLD steps."))
+      make_scaffold_map <- FALSE
+      break
+    }
+    write.FCS(tmp_fcs, paste0(scaffold_dir, "/gated/", basename(gf_file)))
+  }
+  
+  if(is.null(make_scaffold_map)) {
+    if( length(gated_fcss) > 0 ) {
+      make_scaffold_map <- TRUE
+    } else {
+      make_scaffold_map <- FALSE
+      print_message("No gated FCS files were provided. SCAFFoLD map generation will be skipped.")
+    }
   }
 }
 ############# END: Set up SCAFFoLD analysis directories ################
