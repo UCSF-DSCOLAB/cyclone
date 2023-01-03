@@ -563,7 +563,7 @@ if( dir.exists(gated_fcs_dir) ) {
   }
 }
 if(is.null(make_scaffold_map)) {
-  if( exists(gated_fcss) && length(gated_fcss) > 0 ) {
+  if( exists("gated_fcss") && length(gated_fcss) > 0 ) {
     make_scaffold_map <- TRUE
   } else {
     make_scaffold_map <- FALSE
