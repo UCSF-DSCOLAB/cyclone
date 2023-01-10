@@ -561,14 +561,13 @@ if( dir.exists(gated_fcs_dir) ) {
     }
     write.FCS(tmp_fcs, paste0(scaffold_dir, "/gated/", basename(gf_file)))
   }
-  
-  if(is.null(make_scaffold_map)) {
-    if( length(gated_fcss) > 0 ) {
-      make_scaffold_map <- TRUE
-    } else {
-      make_scaffold_map <- FALSE
-      print_message("No gated FCS files were provided. SCAFFoLD map generation will be skipped.")
-    }
+}
+if(is.null(make_scaffold_map)) {
+  if( exists("gated_fcss") && length(gated_fcss) > 0 ) {
+    make_scaffold_map <- TRUE
+  } else {
+    make_scaffold_map <- FALSE
+    print_message("No gated FCS files were provided. SCAFFoLD map generation will be skipped.")
   }
 }
 ############# END: Set up SCAFFoLD analysis directories ################
