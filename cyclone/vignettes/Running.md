@@ -203,9 +203,9 @@ workflow:
     -   As structured currently, R will split the total amount of RAM
         passed in your job to each of the processes requested in
         `my_config.yml`
-    -   We have used ~300Gb RAM for ~20 million cells, and ~420Gb RAM
-        for ~40 million cells. This may vary based on your
-        computer/cluster specs.
+    -   We have used ~300Gb RAM for ~20 million cells, ~420Gb RAM for ~40
+        million cells,  and ~520Gb RAM with `nthreads: 3` for ~50 million
+        cells. This may vary based on your computer/cluster specs.
 
 If processing in parallel, please note that there will be no log
 messages `FlowSOM clustering begins for grid...` after you have received
