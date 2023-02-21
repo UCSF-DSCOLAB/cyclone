@@ -1,0 +1,908 @@
+---
+title: "cyclone follow up with dittoSeq"
+author: "Daniel Bunis"
+date: "2023-02-14"
+output:
+  BiocStyle::html_document:
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error=FALSE, message=FALSE, warning=FALSE)
+suppressMessages({
+  library(SingleCellExperiment)
+  library(dittoSeq)
+  library(BiocStyle)
+})
+```
+
+# Overview
+
+After you have completed running the cyclone pipeline, there will be a number of
+useful outputs, including:
+
+- 'batch_qc_plots.pdf'
+- 'feature_plots.png'
+- 'plots.pdf'
+- 'split_umap_by_clustering.png'
+- various checkpoint_<#>.RData files.
+
+There are many directions that one can follow up with just these outputs.
+
+- Batch effect assessment: 'batch_qc_plots.pdf' contains 2 umap plots (one colored by and one faceted by the "pool_id" batch information from your file_metadata) as well as numerous heatmaps that either show data by batch directly, or are annotated with batch information. These plots can be useful for assessing if features of your data heavily associate with processing batch.  Depending on your experimental design, such association may be expected, but when unexpectedly present, it can be a good idea to perform some form of batch correction.  `CytoNorm` and `cyCombine` are two common pathways for batch correction of CyTOF data which our team has used.
+
+- Cluster Annotation: Now that your similar cells are grouped together into "clusters", it's time to figure out what each cluster represents. This can be a pretty manual process, but is one of the most important steps as annotating cluster biology. It lets us make sense of what differences in cluster frequencies (see below) between samples actually mean. The 'split_umap_by_clustering.png', 'feature_plots.png', and 'plots.pdf' outputs are all useful here. 'split_umap_by_clustering.png' and 'feature_plots.png' can be used together to determine cell type / lineage defining markers that each cluster expresses, or for a different view, the heatmaps contained within 'plots.pdf' show the median expression of each marker within each cluster.
+
+There are also many other directions that your follow up analysis might take you -- too may for us to attempt to build them all in to cyclone directly.
+Luckily, its easy to interface with other tools, like the visualization package dittoSeq.
+
+## Scope of this vignette
+
+In this vignette, we will describe a few such directions. Specifically, we will
+start with direct cyclone outputs and take them through the follow up steps:
+
+1. Consolidate the data into a SingleCellExperiment object
+2. Add cell type annotations for our clusters
+3. Exploring the dataset with dittoSeq (a color vision deficiency & novice coder
+friendly visualization tool)
+4. Run statistics on differences in cluster and cell type frequencies between
+samples.
+
+## Prep - useful functions
+
+First, we'll load in a few functions that should be useful for our purposes.
+These function may eventually become part of the cyclone package itself.
+
+```{r functions}
+# Time-stamped log / message printer, that can be turned off by either giving
+#   'verbose = FALSE' to the function or by setting 'global_verbose <- FALSE' in
+#   upstream code.
+#   Inputs:
+#     ... = Any strings giving to the function will be 'cat'd together and
+#           displayed. There is no need to paste() them together first!
+#     verbose = Logical. An on/off switch.  When set to FALSE, the message will
+#               not be output.
+#     line_after = Logical. Whether to add a new line ("\n") to the end of the
+#                  message.
+timestamped_msg <- function(
+        ..., 
+        verbose = ifelse(exists("global_verbose"),global_verbose, TRUE),
+        line_after = TRUE) {
+    
+    if (verbose) {
+        cat("[ ", format(Sys.time()), " ] ", ..., sep = "")
+        if (line_after) {
+            cat("\n", sep = "")
+        }
+    }
+}
+
+# A simple wrapper on top of saveRDS that automatically sets whether to compress
+#   the object based on cell number.
+save_sce <- function(sce, sce_file_name, compress = NA, ...) {
+    if (is.na(compress)) {
+        compress <- ncol(sce) > 1000000
+    }
+    timestamped_msg(ifelse(compress, "Saving SCE, compressed", "Saving SCE"), " to: ", sce_file_name)
+    saveRDS(sce, file = sce_file_name, compress = compress, ...)
+}
+
+# A function to automatically import cyclone outputs into a SingleCellExperiment
+#   structure OR load one that has already been generated and saved.
+#   Inputs:
+#     sce_file_name
+#     checkpoint1
+#     checkpoint8
+#     load_checkpoints
+#     save = Logical.  Whether to save the SCE object if newly creating it.
+#     make_clusters_factors = Logical.  When creating the SCE object, whether to
+#       ensure 'cluster' metadata are factors with levels in numeric order.
+#       Doing so ensures clusters appear in order from 1,2,3,4,5,...
+#     verbose_read = Logical.  Whether to set 'verbose = TRUE' when loading
+#       'checkpoint1' and 'checkpoint8' data.
+make_or_load_full_sce <- function(
+    sce_file_name,
+    checkpoint1,
+    checkpoint8,
+    load_checkpoints = TRUE,
+    save = file.exists(sce_file_name),
+    make_clusters_factors = FALSE,
+    verbose_read = TRUE) {
+    
+    if (load_checkpoints) {
+        timestamped_msg("Loading Checkpoint 1")
+        load(checkpoint1,
+             envir = .GlobalEnv,
+             verbose = verbose_read)
+        
+        timestamped_msg("Loading Checkpoint 8")
+        load(checkpoint8,
+             envir = .GlobalEnv,
+             verbose = verbose_read)
+    }
+    
+    if ( file.exists(sce_file_name) ) {
+        timestamped_msg("Reading in previously made Rds file, ", sce_file_name)
+        sce <- readRDS(sce_file_name)
+    } else {
+        if (!load_checkpoints) {
+            error("No file at 'sce_file_name', but checkpoint data was not read in.")
+        }
+        timestamped_msg("Making SCE.")
+        sce <- SingleCellExperiment(
+            assays = list(transformed=t(trans_exp)),
+            colData = DataFrame(cell_metadata[, !grepl("UMAP",colnames(cell_metadata))]),
+            reducedDims = list(umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))]))
+        created_sce <- TRUE
+    }
+    
+    if (make_clusters_factors) {
+        for (res in grep("^cluster", colData(sce), value = TRUE)) {
+            this_clusts <- as.numeric(as.character(sce[[res, drop = TRUE]]))
+            sce[[res]] <- factor(
+                sce[[res, drop = TRUE]],
+                levels = min(this_clusts):max(this_clusts)
+            )
+        }
+    }
+    
+    if (created_sce && save) {
+        save_sce(sce, sce_file_name)
+    }
+    
+    timestamped_msg("Done.")
+    sce
+}
+
+# A function to created a down-sampled SingleCellExperiment object from a full
+#   one OR to load one that has already been generated and saved.  NOTE:
+#   performs a simple downsample that does NOT attempt to pull equally from each
+#   sample or cluster.  Purpose is assumed to be testing of visualizations that
+#   take minutes longer to produce from millions of cells than from thousands.
+#   Inputs:
+#     down_sce_filename = 
+#     full_sce =
+#     n_keep = Integer number. The number of cells to retain.
+#     save = Logical. Whether to save the SCE object if newly creating it.
+#     ... = Additional parameters passed through to 'make_or_load_full_sce' for
+#       when the down-sampled object has beeen created and saved previously.
+make_or_load_downsample_sce <- function(
+    down_sce_filename,
+    full_sce,
+    n_keep = 100000,
+    save = TRUE,
+    ...) {
+    
+    if (file.exists(down_sce_filename)) {
+        sce_down <- make_or_load_full_sce(down_sce_filename, load_checkpoints = FALSE, ...)
+    } else {
+        timestamped_msg("Creating downsampled SCE")
+        kept_for_downsample <- sample(ncol(full_sce), min(ncol(full_sce), 100000))
+        sce_down <- full_sce[,kept_for_downsample]
+        if (save) {
+            save_sce(sce_down, down_sce_filename)
+        }
+        timestamped_msg("Done.")
+    }
+    sce_down
+}
+```
+
+# 1. Importing into an SCE
+
+Here, we make use of the SingleCellExperiment object structure because it holds
+everything we need for our cytometry analysis: space for expression matrices,
+per-cell metadata, dimensionality reductions like umap, and even per-marker
+metadata although we won't be making use of that in this vignette.
+
+## Digression1: A mini summary of these SCE components
+
+The 'assays' slot holds matrices in the form of features (rows) by cells
+(columns).  They can be accessed with assay(<sce>, <assay_name>) OR a default
+assay will be retrieved if with simply assay(<sce>).
+
+The 'colData' slot holds metadata for cells, and the 'rowData' slot holds
+metadata for markers. Here, we only make use of 'colData' but the slots work
+similarly. Their structure is a DataFrame where each rows holds data for a
+col (cell) or row (marker) of the object, and columns are the different bits of
+information about them. For example, we will have column in 'colData' holding
+the 'cluster' assignments of each cell.  For convenience, the SCE maintainers
+set up this syntax `<sce>$<colData_column>` to pull directly from colData, which
+makes these data quite easy to access!
+
+The 'reducedDims' slot holds dimensionality reductions, such as UMAP, as
+matrices. There are accessor functions for these as well, `?reducedDims`
+
+## Actually loading in our data
+
+We can make use of the functions created above, but for reference, the true meat
+of the make_or_load_full_sce() function is:
+
+1. Loading checkpoint1 before checkpoint8 because the cell_metadata element of
+the former is updated, with cluster mapping, in the latter.
+2. Generating the SCE with the lines below:
+
+```
+sce <- SingleCellExperiment(
+    assays = list(transformed=t(trans_exp)),
+    colData = DataFrame(cell_metadata[, !grepl("UMAP",colnames(cell_metadata))]),
+    reducedDims = list(umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))]))
+```
+
+```{r load full object}
+full_sce <- make_or_load_full_sce(
+    # sce_file_name is not used in the first pass because we are neither
+    #  loading nor saving, but in later passes this will load the saved version!
+    sce_file_name = "cytof_full.Rds",
+    # Make sure you update these paths to point toward where you have your own
+    #  cyclone outputs saved!
+    checkpoint1 = "checkpoint_1.RData",
+    checkpoint8 = "checkpoint_8.RData",
+    load_checkpoints = TRUE,
+    # We won't save yet because we will be adding new columns to colData in the
+    #   next step. We'll save after that!
+    save = FALSE 
+)
+```
+
+Now let's look at the summary of the object:
+
+```{r display full_sce}
+full_sce
+```
+
+# 2. Add cell type annotations for our clusters
+
+The first step of any cluster-based analysis is making sense of what each
+cluster represents. cyclone's direct outputs serve quite well for this purpose:
+
+'split_umap_by_clustering.png' and 'feature_plots.png' can be used together to
+determine cell type / lineage defining markers that each cluster expresses, or
+for a different view, the heatmaps contained within 'plots.pdf' show the median
+expression of each marker within each cluster.
+
+We recommend compiling your cluster assignments in Excel or other
+table/spreadsheet manipulation tool, then saving them as a .csv or .tsv. (There
+are also tools for loading directly from .xlsx files, but we won't cover them
+here.) As long as you have one column containing the cell ids, and another
+holding cell type names, that's enough!  But generally, it's useful to record
+both 'coarse' and 'fine'-level annotations.
+
+Here, we'll assume this is done, and that the structure of the annotations.csv
+file is something like:
+
+| cluster | coarse | fine |
+|---:|:---:|:---:|
+| 1 | CD4T | CD4T_naive |
+| 2 | NK | NK_mature |
+| 3 | Monocyte | Monocyte_classical |
+
+## Read in your annotations
+
+```{r load and view annotation file}
+annots <- read.csv("annotations.csv")
+head(annots)
+```
+
+## Add annotations to the SCE
+
+This process is simple because of R's `factor` function!  Factors are a useful
+data structure in R where "levels" (potential values) of the data are
+1. pre-defined and 2. ordered.  With the factor function, you can pick a vector
+to start with, set the levels and their order with the `levels` input, and then
+update what any of those levels are called with the `labels` input. Usefully,
+if any levels are given a matching label, they will be combined together. Thus,
+we can make use of this single function to achieve everything we need here --
+renaming from cluster_ids to annotations, combination of clusters given same
+annotations within the new factor!
+
+We'll make use of that function to create and pull in both depths of annotation
+by starting with the cluster metadata / colData.
+
+```{r view clusters}
+head(full_sce$cluster)
+```
+
+We'll make a "coarse_annot" metadata / colData column for the coarse-level. 
+
+```{r add coarse_annot}
+full_sce$coarse_annot <- factor(
+    full_sce$cluster,
+    levels = 1:max(as.numeric(unique(full_sce$cluster))),
+    labels = annots$coarse
+)
+```
+
+We'll make a "fine_annot" metadata / colData column for the fine-level.
+
+```{r add fine_annot}
+full_sce$fine_annot <- factor(
+    full_sce$cluster,
+    levels = 1:max(as.numeric(unique(full_sce$cluster))),
+    labels = annots$fine
+)
+```
+
+## Saving the SCE with these annotations
+
+Now, we can save our SCE to be able to skip re-running a lot of this code in the
+future, using the `save_sce` function defined above. (Alternatively, you can use
+R's `save` or `saveRDS` function directly.  The `save_sce` function is a simple
+wrapper on top of `saveRDS`.)
+
+```{r, eval = FALSE}
+save_sce(full_sce, "cytof_full.Rds")
+```
+
+# 3. Exploring the dataset with dittoSeq
+(a color vision deficiency & novice coder friendly visualization tool)
+
+## Pull in any additional metadata
+
+Ideally, you will have added any sample-specific metadata into the
+`sample_metadata` that went into the cyclone pipeline at the start. Anything
+recorded within `sample_metadata` will have been copied over to the
+`cell_metadata` in the `checkpoint_8.Rdata` that we used for creating our SCE.
+Thus, all that metadata will already be accessible.
+
+But sometimes we receive certain metadata only later. Such data will need to be
+mapped and loaded in.  For our mock case, we'll be loading in patient sex.
+
+```{r load and view sex metadata}
+sex_meta <- read.csv("sex_metadata.csv")
+head(sex_meta)
+```
+
+Now, we need to match the 'ID' column to our 'donor_id' column.  Then we can map
+this sex info to our samples.
+
+```{r view donor_id}
+head(full_sce$donor_id)
+```
+
+```{r add sex metadata}
+full_sce$sex <- sex_meta$Sex[match(
+    # Target order
+    paste0("XVIR1-", full_sce$donor_id),
+    # Original data order
+    sex_meta$ID
+)]
+# View a random few
+rand_cells <- sample(1:ncol(full_sce), 6, replace = FALSE)
+colData(full_sce)[rand_cells, c("donor_id", "sex")]
+```
+
+Depending on the random seed, you may notice that some samples have a sex of
+"N/A" because that data was not known. We'll deal with this later.
+
+## Make some plots with dittoSeq!
+
+The exact set of plots that will be useful for any given data set depends
+heavily upon the experimental design and upon what sample metadata is actually
+available. Maybe you won't need some of these plots, maybe you will. Our goal
+in this section is to give a relatively comprehensive overview of plots that
+be commonly useful. Feel free skip around... none of the code in this section
+makes changes to the underlying sce object, so feel free to only run code that
+seems useful for your own data.
+
+dittoSeq offers plenty of plotting functions that are useful for cytometry data.
+
+- dittoDimPlot
+- dittoFreqPlot
+- dittoBarPlot
+- dittoScatterPlot
+- dittoPlot
+
+**Primary/Required Inputs:** All these functions will take in a target 'object'
+(our down_sce for testing or full_sce when ready to make the real version), as
+well as one or more marker or metadata names to their 'var' and/or 'group.by',
+'color.by', and 'sample.by'. Those alone are minimally enough to make a plot.
+
+**Customize-ability:** All of them also have plenty of quite useful tweaks and
+added functionality built in as well. We'll go through a few examples, but we'd
+encourage you to check out dittoSeq's own vignette and the functions' own
+documentation (e.g. `?dittoDimPlot`) to learn more!
+
+### The basic workflow
+
+**1. Create an SCE representing a subset of the data.**
+
+Because it can take multiple minutes to calculate and display even a single plot
+from millions of cells, we recommend creating a (further) downsampled version of
+your 'full_sce' so that visualizations can be tested out and tweaked more
+quickly. Here, we'll give ourselves and object containing just 100k cells.
+
+```{r downsample}
+set.seed(42)
+down_sce <- make_or_load_downsample_sce(
+    "cytof_down_100k.Rds",
+    full_sce,
+    n_keep = 100000,
+    save = FALSE)
+down_sce
+```
+
+**2. Test and tweak plots on the reduced sce object.** (use 'object = down_sce')
+
+**3. Make final plots using the full sce object.** (switch to using
+'object = fullsce')
+
+**Note: For the final version of this vignette, we will be using the 'full_sce'.
+To implement this suggested workflow for your own data, replace the 'full_sce'
+in code below with 'down_sce' for the initial views and tweaking stage, then
+switch back to 'full_sce' when producing final figures!**
+
+### UMAP Plots with dittoDimPlot
+
+Marker expression or cell metadata can be plotted on the UMAP using
+`dittoDimPlot()`
+
+Some use cases:
+
+- Assessing distributions of sample features or experimental arms
+- Viewing locations of clusters in the umap space.
+
+Primary inputs = object and var. (You can leave out those input names if you
+like, as long as you provide the 'object' first, and 'var' second.)
+
+```{r dittoDimPlot basic}
+# CD3 Marker Expression
+dittoDimPlot(object = full_sce, var = "CD3")
+
+# Sample metadata example 1: sample groups or processing batch metric
+dittoDimPlot(full_sce, "pool_id")
+
+# Sample metadata example 2: coarse-level cell type annotations
+dittoDimPlot(full_sce, "coarse_annot")
+```
+
+#### Some particlarly useful dittoDimPlot tweaks
+
+```{r dittoDimPlot tweaks}
+# Label the color groups & remove the legend
+dittoDimPlot(full_sce, "coarse_annot",
+    # Add labels
+    do.label = TRUE,
+    # Remove the legend
+    legend.show = FALSE)
+
+# Adjust plot order, and also the title
+dittoDimPlot(full_sce, "CD16",
+    # Plot cells with higher expression in the front with 'order = "increasing"'
+    #   Also try: "decreasing" or "randomize"
+    order = "increasing",
+    # Adjust the plot title
+    main = "CD16 Expression")
+
+# Only highlighting certain cells with 'cells.use'
+dittoDimPlot(full_sce, "cluster",
+    cells.use = full_sce$cluster==4)
+
+## Faceting is VERY useful!
+# Example 1: Simple recreation of the effect of the 'split_umap_by_clustering.png'
+dittoDimPlot(down_sce, "cluster",
+    # Create faceted plots where points are 'split' into different facets by a
+    #   metadata given to 'split.by'.
+    # Faceting can help make distribution differences more visible!
+    split.by = "cluster")
+
+# Example 2: Batch Correction Assessment
+#   Ideally, every batches would have cells in all the gray regions of the umap
+dittoDimPlot(full_sce, "pool_id",
+    split.by = "pool_id")
+```
+
+### BoxPlots of cluster or cell type frequencies per sample with dittoFreqPlot
+
+Cell frequencies per-sample, grouped by one or more important metadata can be
+plotted using `dittoFreqPlot()`
+
+Use case:
+
+- Visualize if/how cell frequencies are different across sample groups within
+your dataset
+
+Primary inputs = object, var, sample.by, and group.by.
+(You can leave out those input names if you like, as long as you provide the
+'object' first, and 'var' second.)
+
+```{r dittoFreqPlot basic}
+# Coarse-level frequencies per sample, between sexes
+dittoFreqPlot(object = full_sce, var = "coarse_annot",
+              sample.by = "donor_id", group.by = "sex")
+
+# Cluster frequencies per sample, between sexes, with fine-level annotations in
+#    facet labels.
+dittoFreqPlot(object = full_sce,
+              var = paste(full_sce$fine_annot, full_sce$cluster, sep = "__"),
+              sample.by = "donor_id", group.by = "sex")
+```
+
+#### Some particlarly useful dittoFreqPlot tweaks
+
+```{r dittoFreqPlot tweaks}
+# Allow y-axis to shrink/stretch per data in each facet
+dittoFreqPlot(full_sce, "coarse_annot", "file_name", group.by = "sex",
+    split.adjust = list(scale="free_y"))
+
+# Only show certain cell types
+#   Here: all fine-level annotations in coarse-level "CD4T"
+dittoFreqPlot(full_sce, "fine_annot", "file_name", group.by = "sex",
+    vars.use = unique(full_sce$fine_annot[full_sce$coarse_annot=="CD4T"]))
+
+# **Adjust percentage normalization to a restricted universe** & only show cell
+#   types within that universe.
+#   Here: all fine-level annotations in coarse-level "CD4T" cells
+dittoFreqPlot(full_sce, "fine_annot", "file_name", group.by = "sex",
+    # cells.use adjusts the 'universe' for percent calculation.
+    cells.use = full_sce$coarse_annot=="CD4T",
+    # vars.use limits cells types shown, but does not affect percent calculation
+    vars.use = unique(full_sce$fine_annot[full_sce$coarse_annot=="CD4T"]))
+
+# Coarse-level frequencies per sample, between sexes + also between batch
+#   subgroup with color.by
+# Also targeting just one cell type, for visibility in the same sized plot
+#   For all cells, you'd want to make this plot quite large!
+dittoFreqPlot(full_sce, "coarse_annot", "file_name",
+    group.by = "pool_id",
+    color.by = "sex",
+    vars.use = c("CD8T", "NK", "B", "ASC"))
+```
+
+### Stacked Bar Plots of cluster/batch/group composition with dittoBarPlot
+
+Cell metadata composition per / grouped by any other cell metadata can be
+plotted with `dittoBarPlot()`
+
+Some use cases:
+
+- Assessing equivalence of batch representation across clusters
+
+Primary inputs = object, var, group.by. (You can leave out those input names if
+you like, as long as you provide the 'object' first, 'var' second, and
+'group.by' third.)
+
+```{r dittoBarPlot basic}
+# Sex (or any metadata) breakdown within each cluster.
+dittoBarPlot(object = full_sce, var = "sex", group.by = "cluster")
+
+# Cluster make-up per pool / processing batch
+#   Ideally, you would see relatively similar distributions here.
+dittoBarPlot(full_sce, "cluster", "pool_id")
+```
+
+#### Some particlarly useful dittoBarPlot tweaks
+
+```{r dittoBarPlot tweaks}
+# factor-ized "cluster" metadata for this next example
+full_sce$cluster_factor <- factor(
+    full_sce$cluster,
+    levels = 1:36
+)
+# Respect factor ordering using 'retain.factor.levels'
+#   A 'flaw' relating to updates retaining backwards compatibility, the
+#   developers plan to remove the need for this input in a future update.  But
+#   as of the writing of this vignette, it is still needed.
+dittoBarPlot(full_sce, "sex", group.by = "cluster_factor",
+    retain.factor.levels = TRUE
+    )
+
+# Ignore certain samples
+#   Perhaps, as for the toy dataset here, certain samples were only included as
+#   a batch control, but do not have full information and not intended for
+#   inclusion in down-stream biological questions.
+dittoBarPlot(full_sce, "sex", group.by = "cluster",
+    cells.use = !full_sce$donor_id %in% c("HS2")
+    )
+```
+
+### ScatterPlots, with all the same bells and whistles as umap plotting, dittoScatterPlot
+
+Marker1 by marker2 expression-level scatter plots with dots (cells) optionally
+colored by metadata or marker3 expression
+
+Some use cases:
+
+- Cluster annotation, sub-typing help. Ex: T cells CD45RA by CD27 or CCR7
+
+Primary inputs = object, x.var, y.var (You can leave out those input names if
+you like, as long as you provide the 'object' first, 'x.var' second, and
+'y.var' third.)
+
+```{r dittoScatterPlot basic}
+dittoScatterPlot(object = full_sce, x.var = "CD45RA", y.var = "CCR7")
+
+dittoScatterPlot(full_sce, "CD45RA", "CCR7",
+    color.var = "sex")
+```
+
+#### Some particlarly useful dittoScatterPlot tweaks
+
+```{r dittoScatterPlot tweaks}
+# Faceting (again, it's super useful!)
+dittoScatterPlot(full_sce, "CD45RA", "CCR7", color.var = "cluster",
+    split.by = "cluster")
+
+# Setting titles & ...
+#   The same 'main', 'sub', 'xlab', 'ylab' inputs can set titles across all
+#   dittoSeq visualization functions (only exception is dittoHeatmap, the sole
+#   non-ggplot function, where only 'main' can be used)
+# focusing on only certain samples + cell types with cells.use in a case where perhaps the
+#   control samples are particularly useful for deciding on meaningful value
+#   cutoffs for the target markers.
+dittoScatterPlot(full_sce, "CD45RA", "CCR7", color.var = "cluster",
+    split.by = "cluster",
+    cells.use = full_sce$control_sample & full_sce$coarse_annot == "CD4T")
+```
+
+### violin (or bar, or ridge) plots of marker expression across groups of cells with dittoPlot
+
+Plots where marker expression-level per cell are plotted as violin and/or box
+plots on a y-axes, or ridge plots in the x-axis direction.
+
+Some use cases:
+
+- Cluster annotation, sub-typing help. Ex: T cells CD45RA, CD27, or CCR7 alone across clusters
+
+Primary inputs = object, var, group.by (You can leave out those input names if
+you like, as long as you provide the 'object' first, 'var' second, and
+'group.by' third.)
+
+Very important additional input = plots, which sets the data representations to
+use. I defaults to c("jitter", "vlnplot") which puts a violin in front of jittered points for the individual cells, but changing to c("jitter", "vlnplot", "boxplot") will add
+boxplots on top. Additionally, wrappers **dittoBoxPlot**, **dittoRidgePlot**, and **dittoRidgeJitter** automatically adjust the plots input default to c("boxplot", "jitter"), c("ridgeplot"), and c("ridgeplot", "jitter"), respectively!
+
+```{r dittoPlot basic}
+dittoPlot(object = full_sce, var = "CD45RA", group.by = "cluster")
+
+# For better examples, we'll focus on clusters 1:8 with cells.use
+dittoPlot(object = full_sce, var = "CD45RA", group.by = "cluster",
+    cells.use = full_sce$cluster %in% 1:8)
+
+# Add a boxplot
+dittoPlot(full_sce, "CD45RA", "cluster",
+    cells.use = full_sce$cluster %in% 1:8,
+    plots = c("jitter", "vlnplot", "boxplot"))
+
+# With boxplot, but no violin plots
+dittoPlot(full_sce, "CD45RA", "cluster",
+    cells.use = full_sce$cluster %in% 1:8,
+    plots = c("jitter", "boxplot"))
+```
+
+#### Some particlarly useful dittoPlot tweaks
+
+```{r dittoPlot tweaks}
+# Multiple genes in a single plot, by giving a set of markers to 'var'
+dittoPlot(full_sce,
+    var = c("CD45RA", "CD27", "CCR7"),
+    group.by = "cluster",
+    cells.use = full_sce$cluster %in% 1:8,
+    # Facets will be used for the 'multivars'
+    #   so we can set the faceting shape with split.ncol or split.nrow
+    split.ncol = 1
+    )
+
+# Faceting or coloring as additional cell grouping mechanisms
+dittoPlot(full_sce, "CD45RA",
+    group.by = "sex",
+    split.by = "coarse_annot")
+dittoPlot(full_sce, "CD45RA",
+    group.by = "coarse_annot",
+    color.by = "sex",
+    legend.title = "sex")
+```
+
+# 4. Run statistics on differences in cluster and cell type frequencies between samples.
+
+Frequency comparison is a very common follow up in cytof data analaysis.
+
+The file_by_cluster_freq_norm object output from cyclone can be used for calculating stats, but this is only directly useful at the cluster-level.
+Additional manipulation is required when wanting to calculate stats at the level of coarse or fine cell annotations, which generally combine multiple clusters together.
+
+For this reason, it can be easier to piggy-back off of dittoSeq's dittoFreqPlot data collection in order to gather cell frequency numbers in a more flexible way!  So, we've put together a function for doing that that we'll share here, and we'll take you through using it below!
+
+## freq_stats: A function for generating statistical calculations on top of dittoFreqPlot's data collection.
+
+Minor Note: It's possible that we will include this function right in the `cyclone` package in the future!  If we do that, we will, of course, update this vignette accordingly.
+
+**Run this code chunk to read in the function**
+
+```{r freq_stats function}
+freq_stats <- function(
+  object, group.by, group.1, group.2, sample.by, cell.meta, cell.targs = NULL,
+  data.out = FALSE
+) {
+  
+  # Input checks
+  if ( sum(object[[group.by, drop=TRUE]] == group.1)==0 || sum(object[[group.by, drop=TRUE]] == group.2)==0 ) {
+    stop("Problem in given 'group.by', 'group.1', or 'group.2'. No cells targeted by 'group.1' or 'group.2' for stats collection.")
+  }
+  
+  # Collect stats with dittoSeq
+  data <- dittoFreqPlot(
+    object,
+    var = cell.meta,
+    vars.use = cell.targs,
+    sample.by = sample.by,
+    group.by = group.by,
+    cells.use = object[[group.by, drop=TRUE]] %in% c(group.1, group.2),
+    data.out = TRUE
+  )$data
+  
+  # Clean
+  data$var.data <- NULL # Column only needed for making the plot
+  data$grouping <- NULL # also included in a column with the metadata's name
+  data$label.count.total.per.facet <- NULL # Not needed once used for percent calculation
+  names(data)[1] <- "cell_label"
+  
+  # Here, we loop through all the cell_labels being targeted, 1- calculating stats and 2- building a data.frame during each iteration.
+  #  The lapply call performs the iteration, and gathers the data.frames output by each iteration into a list.
+  #  That list of data.frames created in our lapply is then 'rbind'ed into a single data.frame.
+  stats <- do.call(
+    rbind,
+    lapply(
+      unique(data$cell_label),
+      function(clust) {
+        data_use <- data[data$cell_label==clust,]
+        g1s <- as.vector(data_use[[group.by]]==group.1)
+        g2s <- as.vector(data_use[[group.by]]==group.2)
+        new <- data.frame(
+          cell_label = clust,
+          comparison = paste0(group.1, "_vs_", group.2),
+          median_g1 = median(data_use$percent[g1s]),
+          median_g2 = median(data_use$percent[g2s]),
+          stringsAsFactors = FALSE
+        )
+        new$median_fold_change <- new$median_g1 / new$median_g2
+        new$median_log2_fold_change <- log2(new$median_fold_change)
+        new$p <- wilcox.test(x=data_use$percent[g1s],
+                             y=data_use$percent[g2s])$p.value
+        new
+      })
+  )
+  
+  # Apply FDR correction
+  stats$padj <- p.adjust(stats$p, method = "fdr")
+  
+  # Output
+  if (data.out) {
+    list(stats = stats, data = data)
+  } else {
+    stats
+  }
+}
+```
+
+### It's inputs are:
+
+**Primary:**
+
+- `object`: the SingleCellExperiment (or Seurat, but we're not using that here) object to target. As with plotting, test with 'down_sce', but make sure to switch to 'full_sce' to make your final outputs!
+- `group.by`: String. The name of a metadata within 'object' that holds the condition information you wish to compare between.
+- `group.1` & `group.2`: Single values of the 'group.by' metadata which name the groups to compare.
+- `sample.by`: String. The name of a metadata within 'object' that contains values which are unique for each sample. Typically, this can be "file_name" for cyclone outputs.
+- `cell.meta`: String. The name of a metadata within 'object' that contains the cluster or cell annotation information you wish to target.
+
+**Secondary:**
+
+- `cell.targs`: String vector, optional. If targeting just a subset of the cell annotations named in the 'cell.meta' cell annotation metadata is desired, give that set of cell targets here.
+- `data.out`: Logical.  FALSE by default. Setting it to TRUE will alter the output style to give a list of 2 elements: 'stats' = the standard output, and 'data' = the collected data.frame of cell counts and percentages used for the statistical calculations.  
+
+### How it works, briefly:
+
+The function does 4 things:
+
+1. Calls on dittoFreqPlot for data collection, frequency calculation, and normalization.
+2. Loops through each targeted cell type / annotation to calculates statistics by making us of R's `wilcox.test` function. It's a fitting statistical test for comparison between two groups that, unlike a t-test, does not assume the data has a normal distribution.
+3. Combines the outputs from all cell types into a single data.frame.
+4. Applies a False Discovery Rate p-value adjustment.
+
+To give a better understanding of the inputs to the function, a better understanding of that first step can be helpful:
+The function first makes a call to dittoFreqPlot to gather and normalize cell count data. Within dittoFreqPlot, the number of cells of each 'sample.by' sample assigned to each distinct 'cell.meta' value are gathered. Sample group information is also pulled in at this stage, and only samples whose cells are marked as 'group.1' and 'group.2' in the 'group.by' metadata are targeted for counting.  The total number of cells for a given sample are then calculated (ignoring 'cell.targs' for now) and the counts data is then normalized as percentages of all cells for the given sample.  Finally, if a set of cell names was given to 'cell.targs', this data.frame is trimmed to only retain rows representing those 'cell_meta' values. At this point, the data has been collected and normalized for the stats calculation steps.
+
+## Using freq_stats to compare between two groups
+
+The frequency comparisons to run should be guided by your biological questions.
+
+Was your study designed to assess differences between 2 groups? Then you want to target the metadata holding which cells belong to those 2 groups with `group.by` and give the names of those groups to `group.1` and `group.2`.
+
+Was your study designed to assess difference between 3 groups? This function performs just pairwise comparisons, so you'll want to run it 3 times, targeting 1vs2, 1vs3, an 2vs3 to get the full picture of statistically significant differences. You likely have the group info in a single metadata, and if so you would keep `group.by` the same for all runs, but then adjust `group.1` and `group.2` for each of the distinct comparisons.
+
+Another factor is what cell annotation level to target.  Often, you'll want to assess all the levels you have. Here, we have two annotation levels, "coarse_annot", and "fine_annot", but we also have the individual clusters level as well.  So that makes 3 cell-levels that we would target here.
+
+Finally, is the question of whether you want the 'universe' that cell percentages are normalized within to be "all cells of the given sample" versus "all cells of a certain coarse annotation type". For example, you might be more interested in knowing the percentage of Treg cells out of CD4T cells, than in the percentage of Treg cells out of all cells of the given sample. This can be achieved with our function as well!  Just skip down to the next section to see how!
+
+**Here** We just have one bit of clinical information to compare between that has only two groups -> 1x pairwise group comparison. Plus, we have the "coarse_annot", "fine_annot", and "clusters" levels of cell annotation to compare between -> 3x cell type levels.  That makes for 3 comparisons total.
+
+How this plays out in inputs to the function:
+
+- `group.by`, `group.1`, `group.2`: In the data set for this tutorial, our metadata containing the sample grouping information is called 'sex', so we'll use that for 'group.by'. It's values are "F", representing female, and "M", representing Male, so we'll use 'group.1 = "F"' and 'group.2 = "M"'.
+- `sample.by`: For any cyclone dataset, "file_name" can be used for this input. 
+- `cell.meta`: Our two levels of annotations are stored in "coarse_annot" and "fine_annot" metadata columns, and we can also calculate statistics at the original "cluster" level, but we'll still want an idea of what those cells are, so we'll create a metadata column that's a combination of "fine_annot" and "cluster" below, and use that!
+
+```{r coarse stats}
+# Coarse level
+freq_stats(
+    object = full_sce, 
+    group.by = "sex", group.1 = "F", group.2 = "M",
+    sample.by = "file_name",
+    cell.meta = "coarse_annot")
+```
+
+```{r fine stats}
+# Fine level
+freq_stats(
+    object = full_sce, 
+    group.by = "sex", group.1 = "F", group.2 = "M",
+    sample.by = "file_name",
+    cell.meta = "fine_annot")
+```
+
+```{r cluster stats}
+### Cluster level, but with fine annotations + cluster names to make interpretation easier
+# Create combined metadata
+full_sce$fine_annot__cluster <- paste0(full_sce$fine_annot, "__cluster", full_sce$cluster)
+
+# Run stats
+freq_stats(
+    object = full_sce, 
+    group.by = "sex", group.1 = "F", group.2 = "M",
+    sample.by = "file_name",
+    cell.meta = "fine_annot__cluster") # <-- Now using the metadata defined above
+```
+
+Of course, it's also helpful to have a visual.
+We've described dittoFreqPlot in a previous section.
+Here's how we might use it for the cluster-level:
+
+```{r cluster viz, fig.width = 13, fig.height = 13}
+# Visualization of frequency differences at the cluster-level
+dittoFreqPlot(
+    object = full_sce,
+    var = "fine_annot__cluster",
+    group.by = "sex",
+    sample.by = "file_name",
+    # Optionally target only group.1 and group.2 with:
+    #   (modify "sex", "F", and "M" for your own data)
+    cells.use = full_sce$sex %in% c("F", "M"),
+    # Allow y-axis to shrink/expand per range of each cell type
+    split.adjust = list(scale = "free_y")
+)
+```
+
+## Using freq_stats to compare between two groups
+
+One might also wish to assess cell frequency in terms of "fine" annotation per "coarse" annotation.  For example, you might be more interested in knowing the percentage of Treg cells out of CD4T cells, than in the percentage of Treg cells out of all cells of the given sample.  Luckily, to achieve such metrics, simply subset the SCE first!
+
+```{r fine stats within CD4s}
+# Create a subset of our data that is only the cells labeled as CD4T in coarse_annot
+full_sce_CD4 <- full_sce[, full_sce$coarse_annot=="CD4T"]
+
+# Calculate fine-level statistics within these CD4T cells
+freq_stats(
+    object = full_sce_CD4, 
+    group.by = "sex", group.1 = "M", group.2 = "F",
+    sample.by = "file_name",
+    cell.meta = "fine_annot",
+    # Explicitly targeting just the values of 'fine_annot' here that have a 'coarse_annot' of CD4T 
+    cell.targs = c("CD4T_EM", "CD4T_naive", "Tregs", "CD4T_CM")
+)
+
+# And the visualization
+dittoFreqPlot(
+    object = full_sce_CD4,
+    var = "fine_annot",
+    group.by = "sex",
+    sample.by = "file_name",
+    # Optionally target only group.1 and group.2 with:
+    #   (modify "sex", "F", and "M" for your own data)
+    cells.use = full_sce_CD4$sex %in% c("F", "M"),
+    # vars.use is the cell.targs equivalent in the dittoFreqPlot function
+    vars.use = c("CD4T_EM", "CD4T_naive", "Tregs", "CD4T_CM"),
+    # Allow y-axis to shrink/expand per range of each cell type
+    split.adjust = list(scale = "free_y"),
+    # Update the y-axis label to mention the adjusted universe
+    ylab = "Percent of CD4T cells"
+)
+```
