@@ -154,6 +154,16 @@ example.
 
 How to create: Use `CyTOF_pipeline/make_marker_metadata_csv.R` script.
 
+To invoke this script, it is run from the terminal/command line prompt, NOT
+in Rstudio. 
+
+`$ Rscript make_marker_metadata_csv.R -f fcs_file.fcs -o marker_metadata.csv`
+
+Above is an example invocation. You must update your path to wherever your
+copy of `make_marker_metadata_csv.R` is located, and supply the full file path
+and file name of your own FCS file to run. `marker_metadata.csv` is the 
+suggested name output.
+
 ### Config.yml File
 
 The file directs the pipeline to find all inputs, and is the main point
