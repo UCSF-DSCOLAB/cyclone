@@ -117,7 +117,7 @@ well as any plots that result from running the pipeline.
 
 Required columns:
 
--   `file_name`: the name of the FCS files
+-   `file_name`: the name (not including full path) of the FCS files
 -   `donor_id`: specifies the sample origin
 -   `pool_id`: use any ID mechanism to indicate samples from the same
     CyTOF pool
@@ -153,6 +153,16 @@ might use a marker for clustering, but not for UMAP calculation, for
 example.
 
 How to create: Use `CyTOF_pipeline/make_marker_metadata_csv.R` script.
+
+To invoke this script, it is run from the terminal/command line prompt, NOT
+in Rstudio. 
+
+`$ Rscript make_marker_metadata_csv.R -f fcs_file.fcs -o marker_metadata.csv`
+
+Above is an example invocation. You must update your path to wherever your
+copy of `make_marker_metadata_csv.R` is located, and replace `fcs_file.fcs`
+with the full path and name of one of your own FCS files to run. 
+`marker_metadata.csv` is the suggested name output.
 
 ### Config.yml File
 
