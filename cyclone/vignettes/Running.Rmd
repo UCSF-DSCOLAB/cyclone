@@ -103,7 +103,7 @@ This is the directory where all your checkpoints will be saved to, as well as an
   
 Required columns:
 
-- `file_name`: the name of the FCS files
+- `file_name`: the name (not including full path) of the FCS files
 - `donor_id`: specifies the sample origin
 - `pool_id`: use any ID mechanism to indicate samples from the same CyTOF pool
 - `control_sample`: 'control' means the batch control used in pools (NOT experimental control)
@@ -136,9 +136,9 @@ in Rstudio.
 `$ Rscript make_marker_metadata_csv.R -f fcs_file.fcs -o marker_metadata.csv`
 
 Above is an example invocation. You must update your path to wherever your
-copy of `make_marker_metadata_csv.R` is located, and supply the full file path
-and file name of your own FCS file to run. `marker_metadata.csv` is the 
-suggested name output.
+copy of `make_marker_metadata_csv.R` is located, and replace `fcs_file.fcs`
+with the full path and name of one of your own FCS files to run. 
+`marker_metadata.csv` is the suggested name output.
 
 ## Config.yml File
 
