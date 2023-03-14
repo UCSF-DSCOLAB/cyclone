@@ -1,9 +1,32 @@
 #' output a log message starting with the current system time.
+#' @noRd
 #' @param ... Strings which should be part of the message.
 #' @param verbose Logical. Whether the message should be output at all. Allows for control of verbosity of any functions that call on this function
-timestamped_msg <- function(..., verbose = TRUE) {
+.timestamped_msg <- function(..., verbose = TRUE) {
     if (verbose) {
         cat("[ ", format(Sys.time()), " ] ", ..., "\n", sep = "")
+    }
+}
+
+#' error if packages not installed
+#' @noRd
+#' @param ... package names to check for installation
+#' @param fxn string naming the user-requested action that requires the packages
+.check_packages <- function(..., fxn = "the requested functionality") {
+
+    missing <- c()
+    for (i in ...length) {
+        this_package <- ...elt(i)
+        if (!requireNamespace(this_package, quietly = TRUE)) {
+            missing <- c(missing, this_package)
+        }
+    }
+
+    if (length(missing) > 0) {
+        stop(
+            "Missing package(s) required for", fxn, ":",
+            paste(missing, collapse = ", ")
+        )
     }
 }
 
@@ -11,6 +34,7 @@ timestamped_msg <- function(..., verbose = TRUE) {
 #' @param sce a \code{\link[SingleCellExperiment]{SingleCellExperiment}} object
 #' @param sce_file_name String. A filepath at which to save the \code{sce}.
 #' @param compress Logical or NA. Whether to compress the saved object per like-named input of \code{\link[base]{readRDS}}. When left as \code{NA}, compression is performed if the \code{sce} contains more than 1,000,000 cells.
+#' @param verbose Logical. Whether to output timestamped log messages during running.
 #' @param ... Additional arguments passed to \code{\link[base]{readRDS}}
 #' @return None
 #' @author Daniel Bunis
@@ -19,7 +43,7 @@ save_sce <- function(sce, sce_file_name, compress = NA, verbose, ...) {
     if (is.na(compress)) {
         compress <- ncol(sce) > 1000000
     }
-    timestamped_msg(
+    .timestamped_msg(
         ifelse(compress, "Saving SCE, compressed", "Saving SCE"), " to: ",
         sce_file_name, verbose = verbose)
     saveRDS(sce, file = sce_file_name, compress = compress, ...)
@@ -59,34 +83,46 @@ make_or_load_full_sce <- function(
     verbose_checkpoint_load = TRUE) {
 
     if (load_checkpoints) {
-        timestamped_msg("Loading Checkpoint 1", verbose = verbose)
+        .timestamped_msg("Loading Checkpoint 1", verbose = verbose)
         load(checkpoint1,
              envir = .GlobalEnv,
              verbose = verbose_checkpoint_load)
 
-        timestamped_msg("Loading Checkpoint 8", verbose = verbose)
+        .timestamped_msg("Loading Checkpoint 8", verbose = verbose)
         load(checkpoint8,
              envir = .GlobalEnv,
              verbose = verbose_checkpoint_load)
     }
 
     if ( file.exists(sce_file_name) ) {
-        timestamped_msg("Reading in previously made Rds file, ", sce_file_name, verbose = verbose)
+        .timestamped_msg("Reading in previously made Rds file, ", sce_file_name, verbose = verbose)
         sce <- readRDS(sce_file_name)
     } else {
         if (!load_checkpoints) {
-            error("No file at 'sce_file_name', but checkpoint data was not read in.")
+            stop("No file at 'sce_file_name', but checkpoint data was not read in.")
         }
-        timestamped_msg("Making SCE.", verbose = verbose)
-        sce <- SingleCellExperiment(
-            assays = list(transformed=t(trans_exp)),
-            colData = DataFrame(cell_metadata[, !grepl("UMAP",colnames(cell_metadata))]),
-            reducedDims = list(umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))]))
+        .timestamped_msg("Making SCE.", verbose = verbose)
+        .check_packages(
+            "SingleCellExperiment", "S4Vectors", # S4Vectors is dep of SCE
+            fxn = "creating a SingleCellExperiment object")
+        sce <- SingleCellExperiment::SingleCellExperiment(
+            assays = list(
+                transformed=t(trans_exp)
+            ),
+            colData = S4Vectors::DataFrame(
+                cell_metadata[, !grepl("UMAP",colnames(cell_metadata))]
+            ),
+            reducedDims = list(
+                umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))])
+            )
         created_sce <- TRUE
     }
 
     if (make_clusters_factors) {
-        for (res in grep("^cluster", colData(sce), value = TRUE)) {
+        .check_packages(
+            "SummarizedExperiment", # Another dep of SCE
+            fxn = "making cluster metadata into factors")
+        for (res in grep("^cluster", SummarizedExperiment::colData(sce), value = TRUE)) {
             this_clusts <- as.numeric(as.character(sce[[res, drop = TRUE]]))
             sce[[res]] <- factor(
                 sce[[res, drop = TRUE]],
@@ -99,7 +135,7 @@ make_or_load_full_sce <- function(
         save_sce(sce, sce_file_name)
     }
 
-    timestamped_msg("Done.", verbose = verbose)
+    .timestamped_msg("Done.", verbose = verbose)
     sce
 }
 
@@ -130,16 +166,16 @@ make_or_load_downsample_sce <- function(
     ) {
 
     if (file.exists(down_sce_file_name)) {
-        timestamped_msg("Reading in previously made Rds file, ", down_sce_file_name, verbose = verbose)
+        .timestamped_msg("Reading in previously made Rds file, ", down_sce_file_name, verbose = verbose)
         sce_down <- readRDS(down_sce_file_name)
     } else {
-        timestamped_msg("Creating downsampled SCE", verbose = verbose)
+        .timestamped_msg("Creating downsampled SCE", verbose = verbose)
         kept_for_downsample <- sample(ncol(full_sce), min(ncol(full_sce), 100000))
         sce_down <- full_sce[,kept_for_downsample]
         if (save) {
             save_sce(sce_down, down_sce_file_name)
         }
-        timestamped_msg("Done.", verbose = verbose)
+        .timestamped_msg("Done.", verbose = verbose)
     }
     sce_down
 }
