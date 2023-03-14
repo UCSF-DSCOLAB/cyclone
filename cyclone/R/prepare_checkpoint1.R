@@ -116,8 +116,8 @@ prepare_checkpoint1 <- function(
   if (exclude_controls || subsample) {
     # Handle control exclusion
     if (exclude_controls) {
-      file_metadata <- file_metadata[!file_metadata$control_sample,]
-      cell_metadata <- cell_metadata[!cell_metadata$control_sample,]
+      file_metadata <- file_metadata %>% filter( ! control_sample )
+      cell_metadata <- cell_metadata %>% filter( ! control_sample )
     }
     # Subsampling if subsample == TRUE
     if (subsample) {
