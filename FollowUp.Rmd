@@ -1,7 +1,7 @@
 ---
 title: "cyclone follow up with dittoSeq"
 author: "Daniel Bunis"
-date: "2023-02-14"
+date: "2023-03-14"
 output:
   BiocStyle::html_document:
     toc_float: true
@@ -13,6 +13,7 @@ suppressMessages({
   library(SingleCellExperiment)
   library(dittoSeq)
   library(BiocStyle)
+  library(cyclone)
 })
 ```
 
@@ -48,146 +49,6 @@ friendly visualization tool)
 4. Run statistics on differences in cluster and cell type frequencies between
 samples.
 
-## Prep - useful functions
-
-First, we'll load in a few functions that should be useful for our purposes.
-These function may eventually become part of the cyclone package itself.
-
-```{r functions}
-# Time-stamped log / message printer, that can be turned off by either giving
-#   'verbose = FALSE' to the function or by setting 'global_verbose <- FALSE' in
-#   upstream code.
-#   Inputs:
-#     ... = Any strings giving to the function will be 'cat'd together and
-#           displayed. There is no need to paste() them together first!
-#     verbose = Logical. An on/off switch.  When set to FALSE, the message will
-#               not be output.
-#     line_after = Logical. Whether to add a new line ("\n") to the end of the
-#                  message.
-timestamped_msg <- function(
-        ..., 
-        verbose = ifelse(exists("global_verbose"),global_verbose, TRUE),
-        line_after = TRUE) {
-    
-    if (verbose) {
-        cat("[ ", format(Sys.time()), " ] ", ..., sep = "")
-        if (line_after) {
-            cat("\n", sep = "")
-        }
-    }
-}
-
-# A simple wrapper on top of saveRDS that automatically sets whether to compress
-#   the object based on cell number.
-save_sce <- function(sce, sce_file_name, compress = NA, ...) {
-    if (is.na(compress)) {
-        compress <- ncol(sce) > 1000000
-    }
-    timestamped_msg(ifelse(compress, "Saving SCE, compressed", "Saving SCE"), " to: ", sce_file_name)
-    saveRDS(sce, file = sce_file_name, compress = compress, ...)
-}
-
-# A function to automatically import cyclone outputs into a SingleCellExperiment
-#   structure OR load one that has already been generated and saved.
-#   Inputs:
-#     sce_file_name
-#     checkpoint1
-#     checkpoint8
-#     load_checkpoints
-#     save = Logical.  Whether to save the SCE object if newly creating it.
-#     make_clusters_factors = Logical.  When creating the SCE object, whether to
-#       ensure 'cluster' metadata are factors with levels in numeric order.
-#       Doing so ensures clusters appear in order from 1,2,3,4,5,...
-#     verbose_read = Logical.  Whether to set 'verbose = TRUE' when loading
-#       'checkpoint1' and 'checkpoint8' data.
-make_or_load_full_sce <- function(
-    sce_file_name,
-    checkpoint1,
-    checkpoint8,
-    load_checkpoints = TRUE,
-    save = file.exists(sce_file_name),
-    make_clusters_factors = FALSE,
-    verbose_read = TRUE) {
-    
-    if (load_checkpoints) {
-        timestamped_msg("Loading Checkpoint 1")
-        load(checkpoint1,
-             envir = .GlobalEnv,
-             verbose = verbose_read)
-        
-        timestamped_msg("Loading Checkpoint 8")
-        load(checkpoint8,
-             envir = .GlobalEnv,
-             verbose = verbose_read)
-    }
-    
-    if ( file.exists(sce_file_name) ) {
-        timestamped_msg("Reading in previously made Rds file, ", sce_file_name)
-        sce <- readRDS(sce_file_name)
-    } else {
-        if (!load_checkpoints) {
-            error("No file at 'sce_file_name', but checkpoint data was not read in.")
-        }
-        timestamped_msg("Making SCE.")
-        sce <- SingleCellExperiment(
-            assays = list(transformed=t(trans_exp)),
-            colData = DataFrame(cell_metadata[, !grepl("UMAP",colnames(cell_metadata))]),
-            reducedDims = list(umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))]))
-        created_sce <- TRUE
-    }
-    
-    if (make_clusters_factors) {
-        for (res in grep("^cluster", colData(sce), value = TRUE)) {
-            this_clusts <- as.numeric(as.character(sce[[res, drop = TRUE]]))
-            sce[[res]] <- factor(
-                sce[[res, drop = TRUE]],
-                levels = min(this_clusts):max(this_clusts)
-            )
-        }
-    }
-    
-    if (created_sce && save) {
-        save_sce(sce, sce_file_name)
-    }
-    
-    timestamped_msg("Done.")
-    sce
-}
-
-# A function to created a down-sampled SingleCellExperiment object from a full
-#   one OR to load one that has already been generated and saved.  NOTE:
-#   performs a simple downsample that does NOT attempt to pull equally from each
-#   sample or cluster.  Purpose is assumed to be testing of visualizations that
-#   take minutes longer to produce from millions of cells than from thousands.
-#   Inputs:
-#     down_sce_filename = 
-#     full_sce =
-#     n_keep = Integer number. The number of cells to retain.
-#     save = Logical. Whether to save the SCE object if newly creating it.
-#     ... = Additional parameters passed through to 'make_or_load_full_sce' for
-#       when the down-sampled object has beeen created and saved previously.
-make_or_load_downsample_sce <- function(
-    down_sce_filename,
-    full_sce,
-    n_keep = 100000,
-    save = TRUE,
-    ...) {
-    
-    if (file.exists(down_sce_filename)) {
-        sce_down <- make_or_load_full_sce(down_sce_filename, load_checkpoints = FALSE, ...)
-    } else {
-        timestamped_msg("Creating downsampled SCE")
-        kept_for_downsample <- sample(ncol(full_sce), min(ncol(full_sce), 100000))
-        sce_down <- full_sce[,kept_for_downsample]
-        if (save) {
-            save_sce(sce_down, down_sce_filename)
-        }
-        timestamped_msg("Done.")
-    }
-    sce_down
-}
-```
-
 # 1. Importing into an SCE
 
 Here, we make use of the SingleCellExperiment object structure because it holds
@@ -215,12 +76,12 @@ matrices. There are accessor functions for these as well, `?reducedDims`
 
 ## Actually loading in our data
 
-We can make use of the functions created above, but for reference, the true meat
-of the make_or_load_full_sce() function is:
+We can make use of helper functions included in the `cyclone` package for this.
+Specifically, `make_or_load_full_sce()`.  The main bits of the function are:
 
 1. Loading checkpoint1 before checkpoint8 because the cell_metadata element of
 the former is updated, with cluster mapping, in the latter.
-2. Generating the SCE with the lines below:
+2. Generating the SCE with code equivalent to the lines below:
 
 ```
 sce <- SingleCellExperiment(
@@ -228,6 +89,8 @@ sce <- SingleCellExperiment(
     colData = DataFrame(cell_metadata[, !grepl("UMAP",colnames(cell_metadata))]),
     reducedDims = list(umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))]))
 ```
+
+See `?make_or_load_full_sce` for more details.
 
 ```{r load full object}
 full_sce <- make_or_load_full_sce(
@@ -241,7 +104,8 @@ full_sce <- make_or_load_full_sce(
     load_checkpoints = TRUE,
     # We won't save yet because we will be adding new columns to colData in the
     #   next step. We'll save after that!
-    save = FALSE 
+    save = FALSE,
+    make_clusters_factors = FALSE
 )
 ```
 
@@ -326,9 +190,10 @@ full_sce$fine_annot <- factor(
 ## Saving the SCE with these annotations
 
 Now, we can save our SCE to be able to skip re-running a lot of this code in the
-future, using the `save_sce` function defined above. (Alternatively, you can use
-R's `save` or `saveRDS` function directly.  The `save_sce` function is a simple
-wrapper on top of `saveRDS`.)
+future, using cyclone's `save_sce` helper function. (Alternatively, you can use
+R's `save` or `saveRDS` function directly.  This `save_sce` function is just a
+simple wrapper on top of `saveRDS` that automatically sets `compress = TRUE` for
+SCEs with more than a million cells.)
 
 ```{r, eval = FALSE}
 save_sce(full_sce, "cytof_full.Rds")
@@ -410,7 +275,8 @@ documentation (e.g. `?dittoDimPlot`) to learn more!
 Because it can take multiple minutes to calculate and display even a single plot
 from millions of cells, we recommend creating a (further) downsampled version of
 your 'full_sce' so that visualizations can be tested out and tweaked more
-quickly. Here, we'll give ourselves and object containing just 100k cells.
+quickly. Here, we'll give ourselves and object containing just 100k cells using
+cyclone's `make_or_load_downsample_sce` helper function.
 
 ```{r downsample}
 set.seed(42)
@@ -713,11 +579,6 @@ freq_stats <- function(
   object, group.by, group.1, group.2, sample.by, cell.meta, cell.targs = NULL,
   data.out = FALSE
 ) {
-  
-  # Input checks
-  if ( sum(object[[group.by, drop=TRUE]] == group.1)==0 || sum(object[[group.by, drop=TRUE]] == group.2)==0 ) {
-    stop("Problem in given 'group.by', 'group.1', or 'group.2'. No cells targeted by 'group.1' or 'group.2' for stats collection.")
-  }
   
   # Collect stats with dittoSeq
   data <- dittoFreqPlot(
