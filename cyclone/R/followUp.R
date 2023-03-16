@@ -15,7 +15,7 @@
 .check_packages <- function(..., fxn = "the requested functionality") {
 
     missing <- c()
-    for (i in ...length) {
+    for (i in seq_len(...length())) {
         this_package <- ...elt(i)
         if (!requireNamespace(this_package, quietly = TRUE)) {
             missing <- c(missing, this_package)
@@ -24,7 +24,7 @@
 
     if (length(missing) > 0) {
         stop(
-            "Missing package(s) required for", fxn, ":",
+            "Missing package(s) required for ", fxn, ": ",
             paste(missing, collapse = ", ")
         )
     }
@@ -178,4 +178,122 @@ make_or_load_downsample_sce <- function(
         .timestamped_msg("Done.", verbose = verbose)
     }
     sce_down
+}
+
+#' Calculate per-sample frequencies of clusters or cell annotations, and compare them across group.
+#' @param object A \code{\link[SingleCellExperiment]{SingleCellExperiment}} (or Seurat) object
+#' @param cell.by String name of a per-cell metadata (a column of \code{colData(object)}) containing the cluster or cell annotation identities to quantify and assess.
+#' @param group.by String name of a per-cell metadata (a column of \code{colData(object)}) containing sample-group identities.
+#' @param group.1,group.2 Strings naming the 2 groups within the \code{group.by} metadata which you aim to compare.
+#' @param sample.by String name of a per-cell metadata (a column of \code{colData(object)}) containing which sample each cell belongs to.
+#' Recommendations for cyclone data, (standardiazed because they are required elements of the file_metadata input!): \itemize{
+#' \item 'file_name': holds which original fcs file each cell came from.
+#' \item 'donor_id': holds which patient/mouse each cell came from.
+#' \item somthing else: sometimes, your data might both break up samples' data acquisition accross multiple .fcs files (so 'file_name' would then be too specific) & contain multiple timepoints or conditions per sample (so 'donor_id' is not specific enough).
+#' In such a case, the burden lies on the user to create a viable metadata (\code{<object>$<metadata-name> <- <properly-uniqued-values>}, and then use \code{sample.by = <metadata-name>})
+#' \item 'donor_id' & data subsetting with `cells.use`: As an alternative to creating a new metadata to use for \code{sample.by}, subsetting to only cells from a specific timepoint or condition might serve a dual purpose of achieving your specific analysis goal && allowing 'donor_id' to properly scope to individual samples.
+#' See \code{cells.use} input description for further details.
+#' }
+#' @param cell.targs (Optional) Single string or a string vector naming which cell groups of the \code{cell.by} metadata which should be targetted.
+#' When not provided, the function will loop through all cell groups in the \code{cell.by} metadata.
+#' @param cells.use Logical vector, the same length as the number of cells in the object, which sets which cells to include (TRUE) versus ignore (FALSE).
+#' @param data.out Logical. When set to \code{TRUE}, changes the output from the stats data.frame alone to a named list containing both the stats ("stats") and the underlying per-sample frequency calculations ("data").
+#' @return a data.frame or named list containing 2 data.frames
+#' @details The function starts utilizing \code{\link[dittoSeq]{dittoFreqPlot}} for
+#' \code{cell.by}-cell frequency calculation within \code{sample.by}-samples,
+#' percent normalization,
+#' marking which \code{sample.by}-samples belong to which \code{group.by}-groups,
+#' and trimming to only 1. requested \code{cell.targs},  2. \code{group.by}-groups \code{group.1} and \code{group.2}, and 3. cells matching the \code{cells.use} requirements if any were given.
+#' It then removes some unnecessary columns from the data.frame returned by \code{\link[dittoSeq]{dittoFreqPlot}}. (Set \code{data.out = TRUE} to see what this return looks like!)
+#' Afterwards, it loops through all \code{cell.targs}, building a row of the eventual stats return for each, before compiling (\code{\link{rbind}}) them into a single data.frame.
+#' Lastly, FDR correction is applied to the 'p' column and added as a 'padj' column before data is returned.
+#' @section The stats data.frame return:
+#' Each row holds statistics for an individual comparison.
+#' The columns represent:
+#' \itemize{
+#' \item cell_group: this row's cluster or cell-annotation
+#' \item comparison: this groups of \code{group.by} compared in this row, formatted \code{<group.1>_vs_<group.2>}.
+#' (For compatibility with running the function multiple times, each targwtting distinct groups, and then concatenating all outputs together!)
+#' \item median_g1: the median percent frequency of samples from \code{group.1} for the given cell_group
+#' \item median_g2: the median percent frequency of samples from \code{group.2} for the given cell_group
+#' \item median_fold_change: \code{median_g1 / median_g2}
+#' \item median_log2_fold_chang: \code{log2( median_g1 / median_g2 )}
+#' \item p: The p-value associated with comparison of cell_group percent frequencies of group.1 samples versus group.2 samples using a Mann Whitney U Test / wilcoxon rank sum test (\code{\link[stats]{wilcox.test}}).
+#' \item padj: FDR-corrected p-values, built from running \code{p.adjust(stats$p, method = "fdr")} per all hypotheses tested in this call to the \code{freq_stats} function.
+#' }
+#' @author Daniel Bunis
+#' @export
+#' @importFrom stats wilcox.test
+#' @importFrom stats p.adjust
+#' @importFrom stats median
+freq_stats <- function(
+        object,
+        sample.by,
+        cell.by,
+        group.by, group.1, group.2,
+        cell.targs = NULL,
+        cells.use = TRUE,
+        data.out = FALSE
+) {
+
+    .check_packages(
+        "dittoSeq", # S4Vectors is dep of SCE
+        fxn = "this frequency calculation function")
+
+    if (is.null(cell.targs)) {
+        cell.targs <- dittoSeq::metaLevels(cell.by, object)
+    }
+
+    # Collect stats with dittoSeq
+    data <- dittoSeq::dittoFreqPlot(
+        object,
+        var = cell.by,
+        vars.use = cell.targs,
+        sample.by = sample.by,
+        group.by = group.by,
+        cells.use = cells.use & object[[group.by, drop=TRUE]] %in% c(group.1, group.2),
+        data.out = TRUE
+    )$data
+
+    # Clean
+    data$var.data <- NULL # Column only needed for making the plot
+    data$grouping <- NULL # also included in a column with the metadata's own name
+    data$label.count.total.per.facet <- NULL # Not needed once used for percent calculation
+    names(data)[1] <- "cell_group"
+
+    # Here, we loop through all the cell_groups being targeted, 1- calculating stats and 2- building a data.frame during each iteration.
+    #  The lapply call performs the iteration, and gathers the data.frames output by each iteration into a list.
+    #  That list of data.frames created in our lapply is then 'rbind'ed into a single data.frame.
+    stats <- do.call(
+        rbind,
+        lapply(
+            unique(data$cell_group),
+            function(clust) {
+                data_use <- data[data$cell_group==clust,]
+                g1s <- as.vector(data_use[[group.by]]==group.1)
+                g2s <- as.vector(data_use[[group.by]]==group.2)
+                new <- data.frame(
+                    cell_group = clust,
+                    comparison = paste0(group.1, "_vs_", group.2),
+                    median_g1 = median(data_use$percent[g1s]),
+                    median_g2 = median(data_use$percent[g2s]),
+                    stringsAsFactors = FALSE
+                )
+                new$median_fold_change <- new$median_g1 / new$median_g2
+                new$median_log2_fold_change <- log2(new$median_fold_change)
+                new$p <- wilcox.test(x=data_use$percent[g1s],
+                                     y=data_use$percent[g2s])$p.value
+                new
+            })
+    )
+
+    # Apply FDR correction
+    stats$padj <- p.adjust(stats$p, method = "fdr")
+
+    # Output
+    if (data.out) {
+        list(stats = stats, data = data)
+    } else {
+        stats
+    }
 }

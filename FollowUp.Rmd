@@ -568,72 +568,9 @@ Additional manipulation is required when wanting to calculate stats at the level
 
 For this reason, it can be easier to piggy-back off of dittoSeq's dittoFreqPlot data collection in order to gather cell frequency numbers in a more flexible way!  So, we've put together a function for doing that that we'll share here, and we'll take you through using it below!
 
-## freq_stats: A function for generating statistical calculations on top of dittoFreqPlot's data collection.
+## freq_stats
 
-Minor Note: It's possible that we will include this function right in the `cyclone` package in the future!  If we do that, we will, of course, update this vignette accordingly.
-
-**Run this code chunk to read in the function**
-
-```{r freq_stats function}
-freq_stats <- function(
-  object, group.by, group.1, group.2, sample.by, cell.meta, cell.targs = NULL,
-  data.out = FALSE
-) {
-  
-  # Collect stats with dittoSeq
-  data <- dittoFreqPlot(
-    object,
-    var = cell.meta,
-    vars.use = cell.targs,
-    sample.by = sample.by,
-    group.by = group.by,
-    cells.use = object[[group.by, drop=TRUE]] %in% c(group.1, group.2),
-    data.out = TRUE
-  )$data
-  
-  # Clean
-  data$var.data <- NULL # Column only needed for making the plot
-  data$grouping <- NULL # also included in a column with the metadata's name
-  data$label.count.total.per.facet <- NULL # Not needed once used for percent calculation
-  names(data)[1] <- "cell_label"
-  
-  # Here, we loop through all the cell_labels being targeted, 1- calculating stats and 2- building a data.frame during each iteration.
-  #  The lapply call performs the iteration, and gathers the data.frames output by each iteration into a list.
-  #  That list of data.frames created in our lapply is then 'rbind'ed into a single data.frame.
-  stats <- do.call(
-    rbind,
-    lapply(
-      unique(data$cell_label),
-      function(clust) {
-        data_use <- data[data$cell_label==clust,]
-        g1s <- as.vector(data_use[[group.by]]==group.1)
-        g2s <- as.vector(data_use[[group.by]]==group.2)
-        new <- data.frame(
-          cell_label = clust,
-          comparison = paste0(group.1, "_vs_", group.2),
-          median_g1 = median(data_use$percent[g1s]),
-          median_g2 = median(data_use$percent[g2s]),
-          stringsAsFactors = FALSE
-        )
-        new$median_fold_change <- new$median_g1 / new$median_g2
-        new$median_log2_fold_change <- log2(new$median_fold_change)
-        new$p <- wilcox.test(x=data_use$percent[g1s],
-                             y=data_use$percent[g2s])$p.value
-        new
-      })
-  )
-  
-  # Apply FDR correction
-  stats$padj <- p.adjust(stats$p, method = "fdr")
-  
-  # Output
-  if (data.out) {
-    list(stats = stats, data = data)
-  } else {
-    stats
-  }
-}
-```
+`freq_stata()` is a function included in the `cyclone` package which flexibly generates statistical comparisons between user-requested cell and sample groupings by making use of `dittoFreqPlot()`'s data collection system.
 
 ### It's inputs are:
 
@@ -643,12 +580,13 @@ freq_stats <- function(
 - `group.by`: String. The name of a metadata within 'object' that holds the condition information you wish to compare between.
 - `group.1` & `group.2`: Single values of the 'group.by' metadata which name the groups to compare.
 - `sample.by`: String. The name of a metadata within 'object' that contains values which are unique for each sample. Typically, this can be "file_name" for cyclone outputs.
-- `cell.meta`: String. The name of a metadata within 'object' that contains the cluster or cell annotation information you wish to target.
+- `cell.by`: String. The name of a metadata within 'object' that contains the cluster or cell annotation information you wish to target.
 
 **Secondary:**
 
-- `cell.targs`: String vector, optional. If targeting just a subset of the cell annotations named in the 'cell.meta' cell annotation metadata is desired, give that set of cell targets here.
-- `data.out`: Logical.  FALSE by default. Setting it to TRUE will alter the output style to give a list of 2 elements: 'stats' = the standard output, and 'data' = the collected data.frame of cell counts and percentages used for the statistical calculations.  
+- `cell.targs`: String vector, optional. If targeting just a subset of the cell clusters or annotations named in the 'cell.by' cell annotation metadata is desired, give that set of cell targets here.
+- `cells.use`: Logical vector, optional. If targeting only a certain timepoint/treatment/condition is required for your biological question, *and your are using `group.by` for something else*, give this input `<object-name>$<condition-metadata-name> == '<target-condition>'` OR `<object-name>$<condition-metadata-name> %in% c('<target-condition1>', '<target-condition2>', '<target-condition3>')`
+- `data.out`: Logical.  FALSE by default. Setting it to TRUE will alter the output style to give a list of 2 elements: 'stats' = the standard output, and 'data' = the collected data.frame of cell counts and percentages used for the statistical calculations.
 
 ### How it works, briefly:
 
@@ -660,7 +598,7 @@ The function does 4 things:
 4. Applies a False Discovery Rate p-value adjustment.
 
 To give a better understanding of the inputs to the function, a better understanding of that first step can be helpful:
-The function first makes a call to dittoFreqPlot to gather and normalize cell count data. Within dittoFreqPlot, the number of cells of each 'sample.by' sample assigned to each distinct 'cell.meta' value are gathered. Sample group information is also pulled in at this stage, and only samples whose cells are marked as 'group.1' and 'group.2' in the 'group.by' metadata are targeted for counting.  The total number of cells for a given sample are then calculated (ignoring 'cell.targs' for now) and the counts data is then normalized as percentages of all cells for the given sample.  Finally, if a set of cell names was given to 'cell.targs', this data.frame is trimmed to only retain rows representing those 'cell_meta' values. At this point, the data has been collected and normalized for the stats calculation steps.
+The function first makes a call to dittoFreqPlot to gather and normalize cell count data. Within dittoFreqPlot, the number of cells of each 'sample.by' sample assigned to each distinct 'cell.by' value are gathered. Sample group information is also pulled in at this stage, and only samples whose cells are marked as 'group.1' and 'group.2' in the 'group.by' metadata are targeted for counting.  The total number of cells for a given sample are then calculated (ignoring 'cell.targs' for now) and the counts data is then normalized as percentages of all cells for the given sample.  Finally, if a set of cell names was given to 'cell.targs', this data.frame is trimmed to only retain rows representing those 'cell_meta' values. At this point, the data has been collected and normalized for the stats calculation steps.
 
 ## Using freq_stats to compare between two groups
 
@@ -680,24 +618,24 @@ How this plays out in inputs to the function:
 
 - `group.by`, `group.1`, `group.2`: In the data set for this tutorial, our metadata containing the sample grouping information is called 'sex', so we'll use that for 'group.by'. It's values are "F", representing female, and "M", representing Male, so we'll use 'group.1 = "F"' and 'group.2 = "M"'.
 - `sample.by`: For any cyclone dataset, "file_name" can be used for this input. 
-- `cell.meta`: Our two levels of annotations are stored in "coarse_annot" and "fine_annot" metadata columns, and we can also calculate statistics at the original "cluster" level, but we'll still want an idea of what those cells are, so we'll create a metadata column that's a combination of "fine_annot" and "cluster" below, and use that!
+- `cell.by`: Our two levels of annotations are stored in "coarse_annot" and "fine_annot" metadata columns, and we can also calculate statistics at the original "cluster" level, but we'll still want an idea of what those cells are, so we'll create a metadata column that's a combination of "fine_annot" and "cluster" below, and use that!
 
 ```{r coarse stats}
 # Coarse level
 freq_stats(
-    object = full_sce, 
-    group.by = "sex", group.1 = "F", group.2 = "M",
+    object = full_sce,
     sample.by = "file_name",
-    cell.meta = "coarse_annot")
+    cell.by = "coarse_annot", 
+    group.by = "sex", group.1 = "F", group.2 = "M")
 ```
 
 ```{r fine stats}
 # Fine level
 freq_stats(
-    object = full_sce, 
-    group.by = "sex", group.1 = "F", group.2 = "M",
+    object = full_sce,
     sample.by = "file_name",
-    cell.meta = "fine_annot")
+    cell.by = "fine_annot", 
+    group.by = "sex", group.1 = "F", group.2 = "M")
 ```
 
 ```{r cluster stats}
@@ -707,10 +645,10 @@ full_sce$fine_annot__cluster <- paste0(full_sce$fine_annot, "__cluster", full_sc
 
 # Run stats
 freq_stats(
-    object = full_sce, 
-    group.by = "sex", group.1 = "F", group.2 = "M",
+    object = full_sce,
     sample.by = "file_name",
-    cell.meta = "fine_annot__cluster") # <-- Now using the metadata defined above
+    cell.by = "fine_annot__cluster", 
+    group.by = "sex", group.1 = "F", group.2 = "M") # <-- Now using the metadata defined above
 ```
 
 Of course, it's also helpful to have a visual.
@@ -742,10 +680,10 @@ full_sce_CD4 <- full_sce[, full_sce$coarse_annot=="CD4T"]
 
 # Calculate fine-level statistics within these CD4T cells
 freq_stats(
-    object = full_sce_CD4, 
-    group.by = "sex", group.1 = "M", group.2 = "F",
+    object = full_sce_CD4,
     sample.by = "file_name",
-    cell.meta = "fine_annot",
+    cell.by = "fine_annot", 
+    group.by = "sex", group.1 = "M", group.2 = "F",
     # Explicitly targeting just the values of 'fine_annot' here that have a 'coarse_annot' of CD4T 
     cell.targs = c("CD4T_EM", "CD4T_naive", "Tregs", "CD4T_CM")
 )
