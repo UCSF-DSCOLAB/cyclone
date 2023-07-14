@@ -47,17 +47,17 @@ save_sce <- function(sce, sce_file_name, compress = NA, verbose, ...) {
         ifelse(compress, "Saving SCE, compressed", "Saving SCE"), " to: ",
         sce_file_name, verbose = verbose)
     saveRDS(sce, file = sce_file_name, compress = compress, ...)
+    .timestamped_msg("Saving Complete.", verbose = verbose)
 }
 
 #' A function to automatically import cyclone outputs into a SingleCellExperiment structure OR load one that has already been generated and saved.
 #' @param sce_file_name String. File path of either the sce to load in, or where to save to when \code{save = TRUE}.
 #' @param checkpoint1,checkpoint8 Strings. File paths pointing to cyclone outputs 'checkpoint_1.RData' and 'checkpoint_8.RData' to use.
 #' @param load_checkpoints Logical. Whether or not to load in checkpoint1 and checkpoint8 data.
-#' @param save Logical. Whether to save the SCE object if newly creating it here from checkpoint data
-#' @param make_clusters_factors Logical. When creating the SCE object, whether to ensure 'cluster' metadata are factors with levels in numeric order.
+#' @param make_clusters_factors Logical. When creating the SCE object, whether to ensure numeric 'cluster_#x#' metadata are factors with levels in numeric order.
 #' Doing so ensures clusters appear in order from 1,2,3,4,5, etc. when plotting.
 #' @param verbose Logical. Whether to output timestamped log messages during running.
-#' @param verbose_checkpoint_load = Logical. Whether to set 'verbose = TRUE' in \code{\link[base]{load}} calls for loading 'checkpoint1' and 'checkpoint8' data.
+#' @param verbose_checkpoint_load Logical. Whether to set 'verbose = TRUE' in \code{\link[base]{load}} calls for loading 'checkpoint1' and 'checkpoint8' data.
 #' @return a \code{\link[SingleCellExperiment]{SingleCellExperiment}} object
 #' @details The function starts by loading in primary outputs of the cyclone pipeline if \code{load_checkpoints = TRUE}.
 #' When doing so, it will read in \code{checkpoint1} before \code{checkpoint8},
@@ -68,7 +68,6 @@ save_sce <- function(sce, sce_file_name, compress = NA, verbose, ...) {
 #' \item The 'cell_metadata' output from checkpoint8 is used to fill both  colData and a reducedDim named 'umap'.
 #' }
 #' When \code{make_clusters_factors} is \code{TRUE}, all colData columns whose names start with 'column' are turned into factors with levels ordered from min value to max value.
-#' When \code{save} is \code{TRUE} and an SCE was newly created, \code{\link{save_sce}} is then used to save the newly created SCE to the \code{sce_file_name} file path.
 #' Finally, the SCE is returned.
 #' @author Daniel Bunis
 #' @export
@@ -99,9 +98,9 @@ make_or_load_full_sce <- function(
         sce <- readRDS(sce_file_name)
     } else {
         if (!load_checkpoints) {
-            stop("No file at 'sce_file_name', but checkpoint data was not read in.")
+            stop("No file at 'sce_file_name', but checkpoint data was not read in to make one.")
         }
-        .timestamped_msg("Making SCE.", verbose = verbose)
+        .timestamped_msg("No file at 'sce_file_name', Making SCE.", verbose = verbose)
         .check_packages(
             "SingleCellExperiment", "S4Vectors", # S4Vectors is dep of SCE
             fxn = "creating a SingleCellExperiment object")
@@ -115,24 +114,20 @@ make_or_load_full_sce <- function(
             reducedDims = list(
                 umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))])
             )
-        created_sce <- TRUE
     }
 
     if (make_clusters_factors) {
         .check_packages(
             "SummarizedExperiment", # Another dep of SCE
-            fxn = "making cluster metadata into factors")
-        for (res in grep("^cluster", SummarizedExperiment::colData(sce), value = TRUE)) {
-            this_clusts <- as.numeric(as.character(sce[[res, drop = TRUE]]))
+            fxn = "turning numeric cluster metadata into factors")
+        .timestamped_msg("Turning numeric cluster metadata into factors", verbose = verbose)
+        for (res in grep("^cluster_(\\d)+x(\\d)+$", SummarizedExperiment::colData(sce), value = TRUE)) {
+            this_clusts <- sce[[res, drop = TRUE]]
             sce[[res]] <- factor(
                 sce[[res, drop = TRUE]],
-                levels = min(this_clusts):max(this_clusts)
+                levels = min(this_clusts, na.rm = TRUE):max(this_clusts, na.rm = TRUE)
             )
         }
-    }
-
-    if (created_sce && save) {
-        save_sce(sce, sce_file_name)
     }
 
     .timestamped_msg("Done.", verbose = verbose)
@@ -145,38 +140,23 @@ make_or_load_full_sce <- function(
 #' sample or cluster.  The purpose here is assumed to simply be rapid testing of
 #' visualizations which can take minutes longer to produce from millions of
 #' cells than from thousands of cells.
-#' @param down_sce_file_name String. File path of either the sce to load in, or where to save to when \code{save = TRUE}.
 #' @param full_sce the \code{\link[SingleCellExperiment]{SingleCellExperiment}} object to downsample
 #' @param n_keep Positive integer. The number of cells to retain.
-#' @param save Logical. Whether to save the SCE object if newly creating it.
 #' @param verbose Logical. Whether to output timestamped log messages during running.
 #' @return a \code{\link[SingleCellExperiment]{SingleCellExperiment}} object
-#' @details If a file exists at the specified \code{down_sce_file_name} location, that file will be loaded in and returned.
-#' Otherwise, \code{full_sce} will be subset to a randomly selected \code{n_keep} number of cells.
-#' Then, if \code{save} is \code{TRUE}, \code{\link{save_sce}} is then used to save the downsampled SCE to the \code{down_sce_file_name} file path.
-#' Finally, the downsampled SCE is returned.
+#' @details \code{full_sce} is subset to a randomly selected \code{n_keep} number of cells, and then returned.
 #' @author Daniel Bunis
 #' @export
-make_or_load_downsample_sce <- function(
-    down_sce_file_name,
+downsample_sce <- function(
     full_sce,
     n_keep = 100000,
-    save = TRUE,
     verbose = TRUE
     ) {
 
-    if (file.exists(down_sce_file_name)) {
-        .timestamped_msg("Reading in previously made Rds file, ", down_sce_file_name, verbose = verbose)
-        sce_down <- readRDS(down_sce_file_name)
-    } else {
-        .timestamped_msg("Creating downsampled SCE", verbose = verbose)
-        kept_for_downsample <- sample(ncol(full_sce), min(ncol(full_sce), 100000))
-        sce_down <- full_sce[,kept_for_downsample]
-        if (save) {
-            save_sce(sce_down, down_sce_file_name)
-        }
-        .timestamped_msg("Done.", verbose = verbose)
-    }
+    .timestamped_msg("Creating downsampled SCE", verbose = verbose)
+    kept_for_downsample <- sample(ncol(full_sce), min(ncol(full_sce), 100000))
+    sce_down <- full_sce[,kept_for_downsample]
+    .timestamped_msg("Done.", verbose = verbose)
     sce_down
 }
 
@@ -218,6 +198,7 @@ make_or_load_downsample_sce <- function(
 #' \item median_g2: the median percent frequency of samples from \code{group.2} for the given cell_group
 #' \item median_fold_change: \code{median_g1 / median_g2}
 #' \item median_log2_fold_chang: \code{log2( median_g1 / median_g2 )}
+#' \item positive_fc_means_up_in: Value = \code{group.1}, just a minor note to help remember the directionality of these fold changes!
 #' \item p: The p-value associated with comparison of cell_group percent frequencies of group.1 samples versus group.2 samples using a Mann Whitney U Test / wilcoxon rank sum test (\code{\link[stats]{wilcox.test}}).
 #' \item padj: FDR-corrected p-values, built from running \code{p.adjust(stats$p, method = "fdr")} per all hypotheses tested in this call to the \code{freq_stats} function.
 #' }
@@ -257,7 +238,7 @@ freq_stats <- function(
 
     # Clean
     data$var.data <- NULL # Column only needed for making the plot
-    data$grouping <- NULL # also included in a column with the metadata's own name
+    data$grouping <- NULL # Column only needed for making the plot, it's included in a column with the metadata's own name
     data$label.count.total.per.facet <- NULL # Not needed once used for percent calculation
     names(data)[1] <- "cell_group"
 
@@ -281,6 +262,7 @@ freq_stats <- function(
                 )
                 new$median_fold_change <- new$median_g1 / new$median_g2
                 new$median_log2_fold_change <- log2(new$median_fold_change)
+                new$positive_fc_means_up_in <- group.1
                 new$p <- wilcox.test(x=data_use$percent[g1s],
                                      y=data_use$percent[g2s])$p.value
                 new
