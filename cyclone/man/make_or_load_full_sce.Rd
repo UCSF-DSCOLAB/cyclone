@@ -22,14 +22,12 @@ make_or_load_full_sce(
 
 \item{load_checkpoints}{Logical. Whether or not to load in checkpoint1 and checkpoint8 data.}
 
-\item{save}{Logical. Whether to save the SCE object if newly creating it here from checkpoint data}
-
-\item{make_clusters_factors}{Logical. When creating the SCE object, whether to ensure 'cluster' metadata are factors with levels in numeric order.
+\item{make_clusters_factors}{Logical. When creating the SCE object, whether to ensure numeric 'cluster_#x#' metadata are factors with levels in numeric order.
 Doing so ensures clusters appear in order from 1,2,3,4,5, etc. when plotting.}
 
 \item{verbose}{Logical. Whether to output timestamped log messages during running.}
 
-\item{verbose_checkpoint_load}{= Logical. Whether to set 'verbose = TRUE' in \code{\link[base]{load}} calls for loading 'checkpoint1' and 'checkpoint8' data.}
+\item{verbose_checkpoint_load}{Logical. Whether to set 'verbose = TRUE' in \code{\link[base]{load}} calls for loading 'checkpoint1' and 'checkpoint8' data.}
 }
 \value{
 a \code{\link[SingleCellExperiment]{SingleCellExperiment}} object
@@ -47,7 +45,6 @@ Otherwise, a new SingleCellExperiment (SCE) object is created where: \itemize{
 \item The 'cell_metadata' output from checkpoint8 is used to fill both  colData and a reducedDim named 'umap'.
 }
 When \code{make_clusters_factors} is \code{TRUE}, all colData columns whose names start with 'column' are turned into factors with levels ordered from min value to max value.
-When \code{save} is \code{TRUE} and an SCE was newly created, \code{\link{save_sce}} is then used to save the newly created SCE to the \code{sce_file_name} file path.
 Finally, the SCE is returned.
 }
 \author{

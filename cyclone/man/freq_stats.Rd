@@ -70,6 +70,7 @@ The columns represent:
 \item median_g2: the median percent frequency of samples from \code{group.2} for the given cell_group
 \item median_fold_change: \code{median_g1 / median_g2}
 \item median_log2_fold_chang: \code{log2( median_g1 / median_g2 )}
+\item positive_fc_means_up_in: Value = \code{group.1}, just a minor note to help remember the directionality of these fold changes!
 \item p: The p-value associated with comparison of cell_group percent frequencies of group.1 samples versus group.2 samples using a Mann Whitney U Test / wilcoxon rank sum test (\code{\link[stats]{wilcox.test}}).
 \item padj: FDR-corrected p-values, built from running \code{p.adjust(stats$p, method = "fdr")} per all hypotheses tested in this call to the \code{freq_stats} function.
 }

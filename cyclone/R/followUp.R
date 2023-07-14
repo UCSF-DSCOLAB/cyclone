@@ -121,7 +121,7 @@ make_or_load_full_sce <- function(
             "SummarizedExperiment", # Another dep of SCE
             fxn = "turning numeric cluster metadata into factors")
         .timestamped_msg("Turning numeric cluster metadata into factors", verbose = verbose)
-        for (res in grep("^cluster_(\\d)+x(\\d)+$", SummarizedExperiment::colData(sce), value = TRUE)) {
+        for (res in grep("^cluster_(\\d)+x(\\d)+$", colnames(SummarizedExperiment::colData(sce)), value = TRUE)) {
             this_clusts <- sce[[res, drop = TRUE]]
             sce[[res]] <- factor(
                 sce[[res, drop = TRUE]],

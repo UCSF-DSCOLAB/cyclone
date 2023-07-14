@@ -67,8 +67,8 @@ but one of many such tools.
 ## Digression2: A mini summary of the important SCE components
 
 The 'assays' slot holds matrices in the form of features (rows) by cells
-(columns).  They can be accessed with assay(<sce>, <assay_name>) OR a default
-assay will be retrieved if with simply assay(<sce>).
+(columns).  They can be accessed with `assay(<sce>, <assay_name>)` OR a default
+assay will be retrieved with `assay(<sce>)`.
 
 The 'colData' slot holds metadata for cells, and the 'rowData' slot holds
 metadata for markers. Here, we only make use of 'colData' but the slots work
@@ -111,6 +111,11 @@ full_sce <- make_or_load_full_sce(
     checkpoint8 = "checkpoint_8.RData",
     load_checkpoints = TRUE
 )
+```
+
+```{r, echo=FALSE, results='hide'}
+full_sce <- full_sce[, !is.na(full_sce$cluster)]
+colnames(full_sce) <- paste0("cell_", seq_len(ncol(full_sce)))
 ```
 
 Now let's look at the summary of the object:
@@ -224,7 +229,7 @@ map this sex information to all cells of the data set.
 full_sce$sex <- sex_meta$Sex[match(
     # Target order
     paste0("XVIR1-", full_sce$donor_id),
-    # Original data order
+    # Current data order
     sex_meta$ID
 )]
 # View a random few
@@ -236,7 +241,7 @@ Depending on the random seed, you may notice that some samples have a sex of
 "N/A" because that data is still not known for the control samples.
 We'll deal with this later.
 
-## Specific note for imaging data:
+## Specific note for imaging data
 We plan to create a standard ingestion process for cells' image coordinates in a
 future version of the cyclone pipeline.
 
@@ -261,12 +266,12 @@ coord_meta <- read.csv("coordinates_metadata.csv")
 index_matches <- match(
     # Target order
     full_sce$id,
-    # Original data order
+    # Current data order
     coord_meta$ID
 )
-full_sce$x_loc <- sex_meta$x_loc
-full_sce$y_loc <- sex_meta$y_loc
-full_sce$z_stack <- sex_meta$z_stack
+full_sce$x_loc <- sex_meta$x_loc[index_matches]
+full_sce$y_loc <- sex_meta$y_loc[index_matches]
+full_sce$z_stack <- sex_meta$z_stack[index_matches]
 ```
 
 Afterwards, you can use dittoScatterPlot (more details in a later section) to
@@ -681,6 +686,8 @@ trimmed to only retain rows representing those 'cell_meta' values. At this
 point, the data has been collected and normalized for the stats calculation
 steps.
 
+For additional details, check out the documentation with `?freq_stats`.
+
 ## Using freq_stats to compare between two groups
 
 The frequency comparisons to run should be guided by your biological questions.
@@ -693,7 +700,7 @@ Another factor is what cell annotation level to target. Often, you'll want to as
 
 Finally, is the question of whether you want the 'universe' that cell percentages are normalized within to be "all cells of the given sample" versus "all cells of a certain coarse annotation type". For example, you might be more interested in knowing the percentage of Treg cells out of CD4T cells, rather than the percentage of Treg cells out of all cells of the given sample. This can be achieved with our function as well!  Just skip down to the next section to see how!
 
-**Here** We just have one bit of clinical information to compare between that has only two groups -> 1x pairwise group comparison. Plus, we have the "coarse_annot", "fine_annot", and "clusters" levels of cell annotation to compare between -> 3x cell type levels.  That makes for 3 comparisons total.
+**Here** we will compare across 'sex' which has only two groups in the data -> 1x pairwise group comparison. Plus, we have the "coarse_annot", "fine_annot", and "clusters" levels of cell annotation to compare between -> 3x cell type levels.  That makes for 3 comparisons total.
 
 How this plays out in inputs to the function:
 
