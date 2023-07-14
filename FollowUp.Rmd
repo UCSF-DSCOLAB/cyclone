@@ -113,11 +113,6 @@ full_sce <- make_or_load_full_sce(
 )
 ```
 
-```{r, echo=FALSE, results='hide'}
-full_sce <- full_sce[, !is.na(full_sce$cluster)]
-colnames(full_sce) <- paste0("cell_", seq_len(ncol(full_sce)))
-```
-
 Now let's look at the summary of the object:
 
 ```{r display full_sce}
