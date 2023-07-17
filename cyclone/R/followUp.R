@@ -177,8 +177,9 @@ downsample_sce <- function(
 #' @param cell.targs (Optional) Single string or a string vector naming which cell groups of the \code{cell.by} metadata which should be targetted.
 #' When not provided, the function will loop through all cell groups in the \code{cell.by} metadata.
 #' @param cells.use Logical vector, the same length as the number of cells in the object, which sets which cells to include (TRUE) versus ignore (FALSE).
+#' @param p.adjust.method String, passed along to the \code{method} input of \code{\link[stats]{p.adjust}}, any valid option for that input will work. "fdr" by default.
 #' @param data.out Logical. When set to \code{TRUE}, changes the output from the stats data.frame alone to a named list containing both the stats ("stats") and the underlying per-sample frequency calculations ("data").
-#' @return a data.frame or named list containing 2 data.frames
+#' @return a data.frame, or if \code{data.out} was set to \code{TRUE}, a named list containing 2 data.frames, 'stats' and the underlying 'data'.
 #' @details The function starts utilizing \code{\link[dittoSeq]{dittoFreqPlot}} for
 #' \code{cell.by}-cell frequency calculation within \code{sample.by}-samples,
 #' percent normalization,
@@ -186,7 +187,7 @@ downsample_sce <- function(
 #' and trimming to only 1. requested \code{cell.targs},  2. \code{group.by}-groups \code{group.1} and \code{group.2}, and 3. cells matching the \code{cells.use} requirements if any were given.
 #' It then removes some unnecessary columns from the data.frame returned by \code{\link[dittoSeq]{dittoFreqPlot}}. (Set \code{data.out = TRUE} to see what this return looks like!)
 #' Afterwards, it loops through all \code{cell.targs}, building a row of the eventual stats return for each, before compiling (\code{\link{rbind}}) them into a single data.frame.
-#' Lastly, FDR correction is applied to the 'p' column and added as a 'padj' column before data is returned.
+#' Lastly, \code{p.adjust.method} correction is applied to the 'p' column and added as a 'padj' column before data is returned.
 #' @section The stats data.frame return:
 #' Each row holds statistics for an individual comparison.
 #' The columns represent:
@@ -200,7 +201,7 @@ downsample_sce <- function(
 #' \item median_log2_fold_chang: \code{log2( median_g1 / median_g2 )}
 #' \item positive_fc_means_up_in: Value = \code{group.1}, just a minor note to help remember the directionality of these fold changes!
 #' \item p: The p-value associated with comparison of cell_group percent frequencies of group.1 samples versus group.2 samples using a Mann Whitney U Test / wilcoxon rank sum test (\code{\link[stats]{wilcox.test}}).
-#' \item padj: FDR-corrected p-values, built from running \code{p.adjust(stats$p, method = "fdr")} per all hypotheses tested in this call to the \code{freq_stats} function.
+#' \item padj: p-values corrected by the chosen \code{p.adjust.method}, FDR by default, built from running \code{p.adjust(stats$p, method = p.adjust.method)} per all hypotheses tested in this call to the \code{freq_stats} function.
 #' }
 #' @author Daniel Bunis
 #' @export
@@ -214,6 +215,7 @@ freq_stats <- function(
         group.by, group.1, group.2,
         cell.targs = NULL,
         cells.use = TRUE,
+        p.adjust.method = "fdr",
         data.out = FALSE
 ) {
 
@@ -270,7 +272,7 @@ freq_stats <- function(
     )
 
     # Apply FDR correction
-    stats$padj <- p.adjust(stats$p, method = "fdr")
+    stats$padj <- p.adjust(stats$p, method = p.adjust.method)
 
     # Output
     if (data.out) {
