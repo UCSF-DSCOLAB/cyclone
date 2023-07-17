@@ -154,7 +154,7 @@ downsample_sce <- function(
     ) {
 
     .timestamped_msg("Creating downsampled SCE", verbose = verbose)
-    kept_for_downsample <- sample(ncol(full_sce), min(ncol(full_sce), 100000))
+    kept_for_downsample <- sample(ncol(full_sce), min(ncol(full_sce), n_keep))
     sce_down <- full_sce[,kept_for_downsample]
     .timestamped_msg("Done.", verbose = verbose)
     sce_down
