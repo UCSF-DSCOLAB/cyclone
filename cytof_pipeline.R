@@ -1320,7 +1320,7 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
             clustering_method = "ward.D2", show_colnames=F,
             breaks = breaksList, 
             color = my_palette_greens(length(breaksList)), 
-            main = "File x Cluster: expression (arcsinh-log1p)",
+            main = "File x Feature: expression (arcsinh-log1p)",
             border_color = NA, silent = T
   )
   grid::grid.newpage()
