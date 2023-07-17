@@ -60,7 +60,7 @@ metadata although we won't be making use of that in this vignette.
 
 In addition to the fact that it can be nice simply to have all the relevant data
 in a single object, for saving, loading, and version management purposes, using
-the Biocondoctor-standard SCE format eases interfacing with any of the plethora
+the Bioconductor-standard SCE format eases interfacing with any of the plethora
 of single-cell analysis tools which are built around the structure. dittoSeq is
 but one of many such tools.
 
@@ -102,8 +102,9 @@ See `?make_or_load_full_sce` for more details.
 
 ```{r load full object}
 full_sce <- make_or_load_full_sce(
-    # sce_file_name is not used in the first pass because we are neither
-    #  loading nor saving, but in later passes this will load the saved version!
+    # sce_file_name is not used in the first pass because we don't yet have a
+    #  file at this location, but in later passes this will load the saved
+    #  version!
     sce_file_name = "cytof_full.Rds",
     # Make sure you update these paths to point toward where you have your own
     #  cyclone outputs saved!
@@ -655,6 +656,8 @@ groupings by making use of `dittoFreqPlot()`'s data collection system.
 - `cell.targs`: String vector, optional. If targeting just a subset of the cell clusters or annotations named in the 'cell.by' cell annotation metadata is desired, give that set of cell targets here.
 - `cells.use`: Logical vector, optional. If targeting only a certain timepoint/treatment/condition is required for your biological question, *and your are using `group.by` for something else*, give this input `<object-name>$<condition-metadata-name> == '<target-condition>'` OR `<object-name>$<condition-metadata-name> %in% c('<target-condition1>', '<target-condition2>', '<target-condition3>')`
 - `data.out`: Logical. FALSE by default. Setting it to TRUE will alter the output style to give a list of 2 elements: 'stats' = the standard output, and 'data' = the collected data.frame of cell counts and percentages used for the statistical calculations.
+- `pseudocount`: Number, 0.000001 by default, a small value relative to the lowest expected cell frequencies of the data, which is added to both `group.1` and `group.2` median frequencies in fold_change calculations simply to prevent division by zero in fold_change calculation. This pseudocount has no effect on p-values.
+- `p.adjust.method`: String, "fdr" by default, which sets the type of p-value correction used. It's passed along to the `method` input of the base stats package `p.adjust` function, so any valid option for that function will work.
 
 ### How it works, briefly:
 
