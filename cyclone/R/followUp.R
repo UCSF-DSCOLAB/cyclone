@@ -51,8 +51,8 @@ save_sce <- function(sce, sce_file_name, compress = NA, verbose, ...) {
 }
 
 #' A function to automatically import cyclone outputs into a SingleCellExperiment structure OR load one that has already been generated and saved.
-#' @param sce_file_name String. File path of either the sce to load in, or where to save to when \code{save = TRUE}.
-#' @param checkpoint1,checkpoint8 Strings. File paths pointing to cyclone outputs 'checkpoint_1.RData' and 'checkpoint_8.RData' to use.
+#' @param sce_file_name String. File path of the SingleCellExperiment (SCE) to load in, if previously created.
+#' @param checkpoint1,checkpoint8 Strings. File paths pointing to cyclone outputs 'checkpoint_1.RData' and 'checkpoint_8.RData' to use when \code{load_checkpoints = TRUE}.
 #' @param load_checkpoints Logical. Whether or not to load in checkpoint1 and checkpoint8 data.
 #' @param make_clusters_factors Logical. When creating the SCE object, whether to ensure numeric 'cluster_#x#' metadata are factors with levels in numeric order.
 #' Doing so ensures clusters appear in order from 1,2,3,4,5, etc. when plotting.
@@ -66,17 +66,16 @@ save_sce <- function(sce, sce_file_name, compress = NA, verbose, ...) {
 #' Otherwise, a new SingleCellExperiment (SCE) object is created where: \itemize{
 #' \item The 'trans_exp' output from checkpoint1 is used to fill a 'transformed' assay.
 #' \item The 'cell_metadata' output from checkpoint8 is used to fill both  colData and a reducedDim named 'umap'.
+#' \item If \code{make_clusters_factors} is \code{TRUE}, all colData columns whose names match with 'cluster_#x#' are turned into factors with levels ordered from min value to max value.
 #' }
-#' When \code{make_clusters_factors} is \code{TRUE}, all colData columns whose names start with 'column' are turned into factors with levels ordered from min value to max value.
 #' Finally, the SCE is returned.
 #' @author Daniel Bunis
 #' @export
 make_or_load_full_sce <- function(
-    sce_file_name,
+    sce_file_name = NULL,
     checkpoint1,
     checkpoint8,
     load_checkpoints = TRUE,
-    save = FALSE,
     make_clusters_factors = TRUE,
     verbose = TRUE,
     verbose_checkpoint_load = TRUE) {
@@ -93,7 +92,7 @@ make_or_load_full_sce <- function(
              verbose = verbose_checkpoint_load)
     }
 
-    if ( file.exists(sce_file_name) ) {
+    if ( !identical(sce_file_name, NULL) && file.exists(sce_file_name) ) {
         .timestamped_msg("Reading in previously made Rds file, ", sce_file_name, verbose = verbose)
         sce <- readRDS(sce_file_name)
     } else {
@@ -114,19 +113,19 @@ make_or_load_full_sce <- function(
             reducedDims = list(
                 umap=cell_metadata[, grepl("UMAP",colnames(cell_metadata))])
             )
-    }
 
-    if (make_clusters_factors) {
-        .check_packages(
-            "SummarizedExperiment", # Another dep of SCE
-            fxn = "turning numeric cluster metadata into factors")
-        .timestamped_msg("Turning numeric cluster metadata into factors", verbose = verbose)
-        for (res in grep("^cluster_(\\d)+x(\\d)+$", colnames(SummarizedExperiment::colData(sce)), value = TRUE)) {
-            this_clusts <- sce[[res, drop = TRUE]]
-            sce[[res]] <- factor(
-                sce[[res, drop = TRUE]],
-                levels = min(this_clusts, na.rm = TRUE):max(this_clusts, na.rm = TRUE)
-            )
+        if (make_clusters_factors) {
+            .check_packages(
+                "SummarizedExperiment", # Another dep of SCE
+                fxn = "turning numeric cluster metadata into factors")
+            .timestamped_msg("Turning numeric cluster metadata into factors", verbose = verbose)
+            for (res in grep("^cluster_(\\d)+x(\\d)+$", colnames(SummarizedExperiment::colData(sce)), value = TRUE)) {
+                this_clusts <- sce[[res, drop = TRUE]]
+                sce[[res]] <- factor(
+                    sce[[res, drop = TRUE]],
+                    levels = min(this_clusts, na.rm = TRUE):max(this_clusts, na.rm = TRUE)
+                )
+            }
         }
     }
 
@@ -134,7 +133,7 @@ make_or_load_full_sce <- function(
     sce
 }
 
-#' A function to create a down-sampled SingleCellExperiment object from a full one OR to load one in that has already been generated and saved.
+#' A function to create a down-sampled SingleCellExperiment object from a full one.
 #' @section NOTE:
 #' performs a simple downsample that does NOT attempt to pull equally from each
 #' sample or cluster.  The purpose here is assumed to simply be rapid testing of

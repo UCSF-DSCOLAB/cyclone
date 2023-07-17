@@ -2,7 +2,7 @@
 % Please edit documentation in R/followUp.R
 \name{downsample_sce}
 \alias{downsample_sce}
-\title{A function to create a down-sampled SingleCellExperiment object from a full one OR to load one in that has already been generated and saved.}
+\title{A function to create a down-sampled SingleCellExperiment object from a full one.}
 \usage{
 downsample_sce(full_sce, n_keep = 1e+05, verbose = TRUE)
 }
@@ -17,7 +17,7 @@ downsample_sce(full_sce, n_keep = 1e+05, verbose = TRUE)
 a \code{\link[SingleCellExperiment]{SingleCellExperiment}} object
 }
 \description{
-A function to create a down-sampled SingleCellExperiment object from a full one OR to load one in that has already been generated and saved.
+A function to create a down-sampled SingleCellExperiment object from a full one.
 }
 \details{
 \code{full_sce} is subset to a randomly selected \code{n_keep} number of cells, and then returned.

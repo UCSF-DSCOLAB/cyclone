@@ -5,20 +5,19 @@
 \title{A function to automatically import cyclone outputs into a SingleCellExperiment structure OR load one that has already been generated and saved.}
 \usage{
 make_or_load_full_sce(
-  sce_file_name,
+  sce_file_name = NULL,
   checkpoint1,
   checkpoint8,
   load_checkpoints = TRUE,
-  save = FALSE,
   make_clusters_factors = TRUE,
   verbose = TRUE,
   verbose_checkpoint_load = TRUE
 )
 }
 \arguments{
-\item{sce_file_name}{String. File path of either the sce to load in, or where to save to when \code{save = TRUE}.}
+\item{sce_file_name}{String. File path of the SingleCellExperiment (SCE) to load in, if previously created.}
 
-\item{checkpoint1, checkpoint8}{Strings. File paths pointing to cyclone outputs 'checkpoint_1.RData' and 'checkpoint_8.RData' to use.}
+\item{checkpoint1, checkpoint8}{Strings. File paths pointing to cyclone outputs 'checkpoint_1.RData' and 'checkpoint_8.RData' to use when \code{load_checkpoints = TRUE}.}
 
 \item{load_checkpoints}{Logical. Whether or not to load in checkpoint1 and checkpoint8 data.}
 
@@ -43,8 +42,8 @@ Next, if a file exists at the specified \code{sce_file_name} location, that file
 Otherwise, a new SingleCellExperiment (SCE) object is created where: \itemize{
 \item The 'trans_exp' output from checkpoint1 is used to fill a 'transformed' assay.
 \item The 'cell_metadata' output from checkpoint8 is used to fill both  colData and a reducedDim named 'umap'.
+\item If \code{make_clusters_factors} is \code{TRUE}, all colData columns whose names match with 'cluster_#x#' are turned into factors with levels ordered from min value to max value.
 }
-When \code{make_clusters_factors} is \code{TRUE}, all colData columns whose names start with 'column' are turned into factors with levels ordered from min value to max value.
 Finally, the SCE is returned.
 }
 \author{
