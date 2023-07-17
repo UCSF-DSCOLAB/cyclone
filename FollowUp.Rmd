@@ -1,7 +1,7 @@
 ---
 title: "cyclone follow up with dittoSeq"
 author: "Daniel Bunis"
-date: "2023-03-14"
+date: "2023-07-17"
 output:
   BiocStyle::html_document:
     toc_float: true
@@ -656,7 +656,7 @@ groupings by making use of `dittoFreqPlot()`'s data collection system.
 - `cell.targs`: String vector, optional. If targeting just a subset of the cell clusters or annotations named in the 'cell.by' cell annotation metadata is desired, give that set of cell targets here.
 - `cells.use`: Logical vector, optional. If targeting only a certain timepoint/treatment/condition is required for your biological question, *and your are using `group.by` for something else*, give this input `<object-name>$<condition-metadata-name> == '<target-condition>'` OR `<object-name>$<condition-metadata-name> %in% c('<target-condition1>', '<target-condition2>', '<target-condition3>')`
 - `data.out`: Logical. FALSE by default. Setting it to TRUE will alter the output style to give a list of 2 elements: 'stats' = the standard output, and 'data' = the collected data.frame of cell counts and percentages used for the statistical calculations.
-- `pseudocount`: Number, 0.000001 by default, a small value relative to the lowest expected cell frequencies of the data, which is added to both `group.1` and `group.2` median frequencies in fold_change calculations simply to prevent division by zero in fold_change calculation. This pseudocount has no effect on p-values.
+- `pseudocount`: Number, 0 by default (a.k.a. off by default), a small value to add, in fold_change calculations only, to both `group.1` and `group.2` median frequencies for the purpose of avoiding division by zero errors. When divide-by-zero errors are hit, we recommend using a value which is sufficiently smaller than expected cell fractions, such as 0.000001, in order to ensure that most other fold changes are only minimally affected. (Note: use of this pseudocount input has no effect on p-values.)
 - `p.adjust.method`: String, "fdr" by default, which sets the type of p-value correction used. It's passed along to the `method` input of the base stats package `p.adjust` function, so any valid option for that function will work.
 
 ### How it works, briefly:

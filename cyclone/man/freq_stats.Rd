@@ -13,7 +13,7 @@ freq_stats(
   group.2,
   cell.targs = NULL,
   cells.use = TRUE,
-  pseudocount = 1e-06,
+  pseudocount = 0,
   p.adjust.method = "fdr",
   data.out = FALSE
 )
@@ -42,7 +42,9 @@ When not provided, the function will loop through all cell groups in the \code{c
 
 \item{cells.use}{Logical vector, the same length as the number of cells in the object, which sets which cells to include (TRUE) versus ignore (FALSE).}
 
-\item{pseudocount}{Number, an ideally small value relative to the lowest expected cell frequencies of the data, which is added to both \code{group.1} and \code{group.2} median frequencies to prevent division by zero in fold_change calculation.}
+\item{pseudocount}{Number, zero by default. A value to add, within fold_change calculations only, to both \code{group.1} and \code{group.2} median frequencies in order to avoid division by zero errors.
+When needed, we recommend something small relative to the lowest expected cell frequencies of the data, 0.000001 perhaps.
+Although a relatively small value like this can lead to heavily inflated log fold change values in the extreme cases where \code{group.1} or \code{group.2} frequencies are 0 or near 0, a tiny pseudocount leaves all other fold change values only minimally affected.}
 
 \item{p.adjust.method}{String, passed along to the \code{method} input of \code{\link[stats]{p.adjust}}, any valid option for that input will work. "fdr" by default.}
 
@@ -63,7 +65,7 @@ and trimming to only: 1. requested \code{cell.targs}, 2. \code{group.by}-groups 
 It then removes some unnecessary columns from the data.frame returned by \code{\link[dittoSeq]{dittoFreqPlot}}. (Set \code{data.out = TRUE} to see what this cleaned return looks like!)
 
 Afterwards, it loops through all \code{cell.targs}, building a row of the eventual stats return for each.
-Of note, a small \code{pseudocount} is introduced in median fold change calculation to prevent division by zero errors. This \code{pseudocount} has no effect on p-values and only a nominal effect on fold_changes for most cell types, but can be made smaller to decrease the effect on differences among very rare (fraction less than 0.0001) populations.
+Of note, a \code{pseudocount} can be introduced in median fold change calculation to prevent errors from division by zero. The use of a \code{pseudocount} has no effect on p-values.
 Lastly, \code{p.adjust.method} correction, FDR by default, is applied to the 'p' column and added as a 'padj' column before data is returned.
 }
 \section{The stats data.frame return}{
@@ -76,8 +78,8 @@ The columns represent:
 (For compatibility with running the function multiple times, each targwtting distinct groups, and then concatenating all outputs together!)
 \item median_g1: the median frequency for the given cell_group within samples from \code{group.1}
 \item median_g2: the median frequency for the given cell_group within samples from \code{group.2}
-\item median_fold_change: \code{(median_g1 + pseudocount) / (median_g2 + pseudocount)}. A small \code{pseudocount} is used here to prevent division by zero errors.
-\item median_log2_fold_chang: \code{log2( median_fold_change )}
+\item median_fold_change: \code{(median_g1 + pseudocount) / (median_g2 + pseudocount)}. Although zero by default, a small \code{pseudocount} can be set used to prevent division by zero error cases while only nominally affecting the value of other cases.
+\item median_log2_fold_change: \code{log2( median_fold_change )}
 \item positive_fc_means_up_in: Value = \code{group.1}, just a minor note to help remember the directionality of these fold changes!
 \item p: The p-value associated with comparison of cell_group percent frequencies of group.1 samples versus group.2 samples using a Mann Whitney U Test / wilcoxon rank sum test (\code{\link[stats]{wilcox.test}}).
 \item padj: p-values corrected by the chosen \code{p.adjust.method}, FDR by default, built from running \code{p.adjust(stats$p, method = p.adjust.method)} per all hypotheses tested in this call to the \code{freq_stats} function.
