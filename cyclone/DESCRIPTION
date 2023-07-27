@@ -36,6 +36,9 @@ Imports: cluster,
 Suggests: knitr,
     rmarkdown,
     BiocStyle,
-    dittoSeq
+    dittoSeq,
+    SingleCellExperiment,
+    S4Vectors,
+    SummarizedExperiment
 VignetteBuilder: knitr
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.3

@@ -2,15 +2,15 @@
 
 This repo houses the UCSF Data Science CoLab's CyTOF pipeline which performs umap calculation and clustering, and also outputs many QC and annotation focused visualizations.
 
-Our team: Ravi Patel, Bushra Samad, Rebecca Jaszczak, Dan Bunis, Tristan Courau, Nayvin Chew, Chris Im, Arjun Rao, Lia Avesanyan, Lenny lupin, Alexis Combes and Gabi Fragiadakis
+Our team: Ravi Patel,  Rebecca Jaszczak, Chris Im, Nicholas Carey, Tristan Courau, Dan Bunis, Bushra Samad, Lia Avanesyan, Nayvin Chew, Sarah Stenske, Jillian M. Jespersen, Jean Publicover, Austin Edwards, Mohammad Naser, Arjun Rao, Lenny Lupin-Jimenez, Matthew Krummel, Stewart Cooper, Jody Baron, Alexis Combes, and Gabriela Fragiadakis
 
 The pipeline is run primarily via the `cytof_pipeline.R` script, but we have also put together the `cyclone` R package to provide access to documentation and to help users get all of the pipeline's package dependencies installed.
 
 ---
 
-**General Information & Instructions for Installation and Usage:** These are maintained within `cyclone`. See the [package vignette](cyclone/vignettes/Running.md) to get started.
+**General Information & Instructions for Installation and Usage:** These are maintained within `cyclone`, but we've added knit'd versions of all vignettes to this repo. See the ["Running" vignette](vignettes/Running.md) to get started, and the ["FollowUp" vignette](vignettes/FollowUp.html) for ideas of what can be done with cyclone outputs after running the pipeline.
 
-**Citation Instructions**: We are working to put together a manuscript describing the pipeline, but it is not yet ready. For now, please reach out to us for up-to-date citation instructions if you have used the pipeline for work that you plan to publish.
+**Citation Instructions**: We have put together a manuscript describing the pipeline.  [bioRxiv preprint is here]( https://www.biorxiv.org/content/10.1101/2023.03.08.531782v1), peer-reviewed version is coming soon!
 
 **Have questions or want to contribute?**: You can reach us and/or contribute to this work by either 1) opening up an 'Issue' above to describe any bugs or feature requests in a public spot where other users might see, or 2) reaching out to a development team member by email. See the cyclone vignette for contact details. Or, 3) if you have code or documentation updates which you would like us to consider implementing directly, refer to the "Direct Contribution Instructions" below to contribute via a 'Pull Request'.
 
