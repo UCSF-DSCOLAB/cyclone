@@ -197,7 +197,3 @@ The pipeline is broken down into multiple chunks, where each chunk saves its out
   - `split_umap_by_cluster.png` - histogram of each clusters density in UMAP space dimensions
   - `Rplots.pdf` per cluster, histogram of median expression of all markers
   - `plots.pdf` - umap colored by pool ID to survey potential batch effects
-  
-# WIP
-  
-// A second vignette for visualization and exploration of the outputs, coming soon.
