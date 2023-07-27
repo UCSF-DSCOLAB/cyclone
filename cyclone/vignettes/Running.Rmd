@@ -174,7 +174,7 @@ If you are submitting on a shared compute cluster, here is a suggested workflow:
 - Larger datasets (over 20 million cells) may need to allocate scratch directories, e.g. `--gres=scratch:500G`, pending cluster requirements.
 - Request enough RAM for the number of cells contained in your dataset.
   - As structured currently, R will split the total amount of RAM passed in your job to each of the processes requested in `my_config.yml`
-  - We have used ~300Gb RAM for ~20 million cells, and ~420Gb RAM for ~40 million cells. This may vary based on your computer/cluster specs.
+  - We have used ~100Gb RAM without parallaization with ~20million cells (config 'nthreads: 1'), ~420Gb RAM for 4x parallelization with ~40million cells (config 'nthreads: 4', scheduler ntasks=5), and ~520Gb RAM for 3x parallelization with ~50 million cells (config 'nthreads: 3', scheduler ntasks=4). This may vary based on your computer/cluster specs.
 
 If processing in parallel, please note that there will be no log messages `FlowSOM clustering begins for grid...` after you have received the `Starting the FlowSOM clustering...` message.
   
@@ -207,7 +207,3 @@ The pipeline is broken down into multiple chunks, where each chunk saves its out
   - `split_umap_by_cluster.png` - histogram of each clusters density in UMAP space dimensions
   - `Rplots.pdf` per cluster, histogram of median expression of all markers
   - `plots.pdf` - umap colored by pool ID to survey potential batch effects
-  
-# WIP
-  
-// A second vignette for visualization and exploration of the outputs, coming soon.
