@@ -10,7 +10,7 @@ The pipeline is run primarily via the `cytof_pipeline.R` script, but we have als
 
 **General Information & Instructions for Installation and Usage:** These are maintained within `cyclone`, but we've added knit'd versions of all vignettes to this repo. See the ["Running" vignette](vignettes/Running.md) to get started, and the ["FollowUp" vignette](vignettes/FollowUp.html) for ideas of what can be done with cyclone outputs after running the pipeline.
 
-**Citation Instructions**: We have put together a manuscript describing the pipeline.  [bioRxiv preprint is here]( https://www.biorxiv.org/content/10.1101/2023.03.08.531782v1), peer-reviewed version is coming soon!
+**Citation Instructions**: Please cite our [manuscript](https://www.frontiersin.org/articles/10.3389/fimmu.2023.1167241).
 
 **Have questions or want to contribute?**: You can reach us and/or contribute to this work by either 1) opening up an 'Issue' above to describe any bugs or feature requests in a public spot where other users might see, or 2) reaching out to a development team member by email. See the cyclone vignette for contact details. Or, 3) if you have code or documentation updates which you would like us to consider implementing directly, refer to the "Direct Contribution Instructions" below to contribute via a 'Pull Request'.
 
