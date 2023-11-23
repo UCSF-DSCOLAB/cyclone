@@ -1321,3 +1321,24 @@ pdf(file.path(out_dir, "batch_qc_plots.pdf"))
   
 dev.off()
 
+
+
+## UMAPs split by clusters
+set.seed(1234)
+cell_metadata_sub = cell_metadata %>% sample_n(min(nrow(.),100000))
+cell_metadata_sub$col_to_use = cell_metadata_sub$cluster
+x_range = range(cell_metadata_sub$UMAP1) %>% scales::expand_range(add = 0.2)
+y_range = range(cell_metadata_sub$UMAP2) %>% scales::expand_range(add = 0.2)
+cm_tmp = cell_metadata_sub %>% group_by(col_to_use) %>% sample_n(33, replace=T)
+plot_list = list()
+groups = sort(unique(cell_metadata_sub$col_to_use))
+for(i in groups ) {
+  p = cell_metadata_sub %>% filter(col_to_use == i) %>% ggplot(aes(UMAP1, UMAP2)) + geom_rect(data=cm_tmp, aes(xmin=UMAP1-0.05,xmax=UMAP1+0.05,ymin=UMAP2-0.05,ymax=UMAP2+0.05), color="gray95", fill="gray95") + geom_point(size=0.1, alpha=0.3) + theme_classic() + xlim(x_range) + ylim(y_range) + ggtitle(i)
+  plot_list[[i]] = ggExtra::ggMarginal(p, type = "histogram", fill = "red", binwidth = 0.1)
+}
+grid_size = get_plot_grid_layout(length(groups))
+png(file.path(out_dir, "split_umap_by_cluster.png"), width=30, height=30, units = "in", res=600, pointsize = 4)
+ggarrange(plotlist=plot_list, ncol=grid_size$ncol, nrow=grid_size$nrow)
+dev.off()
+
+
