@@ -12,6 +12,9 @@ The pipeline is run primarily via the `cytof_pipeline.R` script, but we have als
 
 **Citation Instructions**: Please cite our [manuscript](https://www.frontiersin.org/articles/10.3389/fimmu.2023.1167241).
 
+Patel Ravi K. , Jaszczak Rebecca G. , Im Kwok , Carey Nicholas D. , Courau Tristan , Bunis Daniel G. , Samad Bushra , Avanesyan Lia , Chew Nayvin W. , Stenske Sarah , Jespersen Jillian M. , Publicover Jean , Edwards Austin W. , Naser Mohammad , Rao Arjun A. , Lupin-Jimenez Leonard , Krummel Matthew F. , Cooper Stewart , Baron Jody L. , Combes Alexis J. , Fragiadakis Gabriela K. **Cyclone: an accessible pipeline to analyze, evaluate, and optimize multiparametric cytometry data.** *Front Immunol* 2023;14:1167241. doi:10.3389/fimmu.2023.1167241
+
+
 **Have questions or want to contribute?**: You can reach us and/or contribute to this work by either 1) opening up an 'Issue' above to describe any bugs or feature requests in a public spot where other users might see, or 2) reaching out to a development team member by email. See the cyclone vignette for contact details. Or, 3) if you have code or documentation updates which you would like us to consider implementing directly, refer to the "Direct Contribution Instructions" below to contribute via a 'Pull Request'.
 
 ---
