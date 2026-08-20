@@ -1142,6 +1142,9 @@ grid::grid.draw(p$gtable)
 cluster_median_exp_s = apply( cluster_median_exp_tmp, 2, scale)
 rownames(cluster_median_exp_s) = rownames(cluster_median_exp_tmp)
 nonNA_idx = complete.cases(t(cluster_median_exp_s))
+if(sum(!nonNA_idx) > 0) {
+  warning("Following features are removed from the scaled expression heatmap due to invariable median expression across clusters:\n", paste0(colnames(cluster_median_exp_tmp)[ !nonNA_idx], collapse=", "))
+}
 p <- pheatmap::pheatmap( cluster_median_exp_s[, nonNA_idx], clustering_method="ward.D2", main="Archsinh-transformed expression (column-scaled)", silent = T )
 grid::grid.newpage()
 grid::grid.draw(p$gtable)
